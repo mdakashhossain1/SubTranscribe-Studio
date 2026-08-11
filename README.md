@@ -68,18 +68,88 @@ It can:
 - Use your GPU (NVIDIA CUDA or AMD/Intel via Vulkan) for fast processing, or fall back to a quantized CPU mode if you don't have a supported GPU
 - Process a single file or queue up a whole batch of files at once
 
-## Getting Started
+## 🚀 Platform-Specific Setup & Installation Guide
 
-**Prebuilt (recommended):** download and run the installer or portable ZIP from the [Releases page](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest) — nothing else to set up.
+### 🪟 Windows (10/11)
+1. Download **`SubTranscribe_Studio_Setup_v1.0.0.exe`** or **`SubTranscribe-Studio-Windows-Portable.zip`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
+2. Double-click the `.exe` installer to install, or unzip the `.zip` and double-click **`SubGen.exe`**.
+3. *(Optional)* If Windows SmartScreen warning appears on first launch, click **More info → Run anyway**.
 
-**From source:**
+---
 
-1. Double-click **`run.bat`**.
-   - The first time you run it, it will automatically create a local Python environment and install everything it needs — just wait for it to finish.
-   - Every time after that, it launches instantly.
-2. The app opens on the **Dashboard**. Pick a file, choose your settings, and click **Generate Subtitles**.
+### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
+1. Install system audio & video dependencies:
+   ```bash
+   sudo apt update && sudo apt install -y ffmpeg portaudio19-dev python3-tk
+   ```
+2. Download **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
+3. Extract and launch:
+   ```bash
+   tar -xzvf SubTranscribe-Studio-Linux-x86_64.tar.gz
+   ./SubGen
+   ```
 
-That's it — no accounts, no sign-in, no internet connection required for transcription.
+---
+
+### 🍓 Raspberry Pi OS (Raspberry Pi 4 / 5 - ARM64 Linux)
+1. Install system dependencies:
+   ```bash
+   sudo apt update && sudo apt install -y ffmpeg portaudio19-dev python3-tk
+   ```
+2. Download **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
+3. Extract and launch:
+   ```bash
+   tar -xzvf SubTranscribe-Studio-RaspberryPi-arm64.tar.gz
+   ./SubGen
+   ```
+
+---
+
+### 🍎 macOS (MacBook Intel & Apple Silicon M1/M2/M3/M4)
+1. Install FFmpeg (via Homebrew):
+   ```bash
+   brew install ffmpeg
+   ```
+2. Download **`SubTranscribe-Studio-macOS-universal.zip`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
+3. Unzip and double-click **`SubTranscribeStudio`**.
+4. *(Note)* On first launch, if macOS Gatekeeper flags unverified developer: **Right-click `SubTranscribeStudio` → Open → Click Open**.
+
+---
+
+### 🐳 Docker Container (Synology NAS / Unraid / TrueNAS / Linux Server)
+1. Clone the repository or download `docker-compose.yml`:
+   ```bash
+   git clone https://github.com/mdakashhossain1/SubTranscribe-Studio.git
+   cd SubTranscribe-Studio
+   ```
+2. Launch container with Docker Compose:
+   ```bash
+   docker compose up -d
+   ```
+
+---
+
+### 🛠️ Running from Source (Windows / Linux / macOS)
+
+1. **Clone repository**:
+   ```bash
+   git clone https://github.com/mdakashhossain1/SubTranscribe-Studio.git
+   cd SubTranscribe-Studio
+   ```
+
+2. **Create & activate virtual environment**:
+   - **Windows**:
+     ```cmd
+     run.bat
+     ```
+     *(Or manually: `python -m venv .venv` then `.venv\Scripts\activate`)*
+   - **Linux / macOS**:
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     pip install -r requirements.txt
+     python3 subgen.py
+     ```
 
 ---
 
