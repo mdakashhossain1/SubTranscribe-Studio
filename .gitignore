@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[codz]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+
+# Downloaded AI model weights (auto-downloaded by the app at runtime — multi-GB)
+models/
+
+# Vendored whisper.cpp source/build tree (only the compiled bin/whispercpp/*
+# runtime binaries are needed and those ARE tracked)
+whisper.cpp/
+
+# PyInstaller / Inno Setup build output
+build/
+dist/
+*.spec
+
+# User-local runtime data
+history.json
+create_sc.vbs
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

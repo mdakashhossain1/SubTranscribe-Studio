@@ -1,0 +1,7 @@
+﻿faster-whisper
+customtkinter
+deep-translator
+sounddevice
+Pillow
+PyMuPDF
+psutil

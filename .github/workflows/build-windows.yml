@@ -1,0 +1,91 @@
+name: Build Windows Executable
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Generate app icon from logo.png
+        run: |
+          python -c "from PIL import Image; img = Image.open('assets/logo.png'); img.save('assets/logo.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller
+          --name "SubGen"
+          --windowed
+          --onedir
+          --icon "assets/logo.ico"
+          --collect-all customtkinter
+          --collect-all faster_whisper
+          --collect-all ctranslate2
+          --collect-all deep_translator
+          --collect-all tiktoken
+          --collect-all tokenizers
+          --collect-all sounddevice
+          --collect-all pymupdf
+          --hidden-import tkinter
+          --hidden-import tkinter.filedialog
+          --hidden-import tkinter.messagebox
+          --hidden-import faster_whisper
+          --hidden-import ctranslate2
+          --clean
+          --noconfirm
+          subgen.py
+
+      - name: Bundle runtime assets
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse -Force assets dist/SubGen/assets
+          if (Test-Path bin) { Copy-Item -Recurse -Force bin dist/SubGen/bin }
+
+      - name: Zip portable build
+        shell: pwsh
+        run: Compress-Archive -Path dist/SubGen/* -DestinationPath SubTranscribe-Studio-Windows-Portable.zip
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubTranscribe-Studio-Windows
+          path: |
+            SubTranscribe-Studio-Windows-Portable.zip
+            dist/SubTranscribe_Studio_Setup_*.exe
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            SubTranscribe-Studio-Windows-Portable.zip
+            dist/SubTranscribe_Studio_Setup_*.exe
+          generate_release_notes: true
