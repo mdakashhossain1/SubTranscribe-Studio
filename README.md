@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="image/Screenshot (62).png" alt="SubTranscribe Studio Interface" width="100%">
+  <img src="image/dashboard.png" alt="SubTranscribe Studio Interface" width="100%">
 </p>
 
 ---
@@ -73,10 +73,10 @@ The main workspace, and the screen you land on when you open the app. It's split
 Use this screen for everyday, single-file transcription with full control over every setting.
 
 <p align="center">
-  <img src="image/Screenshot (62).png" alt="Dashboard Workspace" width="100%">
+  <img src="image/dashboard.png" alt="Dashboard Workspace" width="100%">
 </p>
 <p align="center">
-  <img src="image/Screenshot (72).png" alt="Live Waveform & Subtitle Editor Studio" width="100%">
+  <img src="image/waveform_editor.png" alt="Live Waveform & Subtitle Editor Studio" width="100%">
 </p>
 
 ### 🎙️ Transcribe
@@ -84,7 +84,7 @@ Use this screen for everyday, single-file transcription with full control over e
 A simplified, focused version of the Dashboard for when you just want to get subtitles quickly. Drop in a file, pick a model/language/format from a short list of dropdowns, and go — without the extra advanced controls cluttering the screen.
 
 <p align="center">
-  <img src="image/Screenshot (63).png" alt="Transcribe View" width="100%">
+  <img src="image/transcribe.png" alt="Transcribe View" width="100%">
 </p>
 
 ### 📼 Batch Processing
@@ -92,7 +92,7 @@ A simplified, focused version of the Dashboard for when you just want to get sub
 Queue up multiple video or audio files and transcribe them one after another automatically instead of doing them one at a time. Add files with **Add Media Files**, review the queue (file name, output format, status), remove anything you don't want, then click **Start Batch Processing** to run through the whole list.
 
 <p align="center">
-  <img src="image/Screenshot (64).png" alt="Batch Processing Queue" width="100%">
+  <img src="image/batch_processing.png" alt="Batch Processing Queue" width="100%">
 </p>
 
 ### 🧠 Models
@@ -113,7 +113,7 @@ The AI Model Manager. Whisper comes in several sizes, and this screen lets you d
 Bigger models are more accurate but need more disk space, memory, and time. Each model card shows its download size, approximate memory requirement, and whether it's already downloaded on your PC. Not sure which to pick? The **Reset to Best (Auto)** button on the Dashboard's Advanced Settings will detect your GPU/CPU and pick the strongest model your hardware can comfortably run.
 
 <p align="center">
-  <img src="image/Screenshot (65).png" alt="AI Model Manager" width="100%">
+  <img src="image/models.png" alt="AI Model Manager" width="100%">
 </p>
 
 ### ⚙️ Settings
@@ -126,7 +126,7 @@ Application-wide preferences that apply no matter which file you're working on:
 - **Purge All Models & Cache** — a full cleanup button that deletes every downloaded AI model, cached file, and history entry, leaving no trace on your PC
 
 <p align="center">
-  <img src="image/Screenshot (66).png" alt="Settings Screen" width="100%">
+  <img src="image/settings.png" alt="Settings Screen" width="100%">
 </p>
 
 ### 🕘 History
@@ -134,7 +134,7 @@ Application-wide preferences that apply no matter which file you're working on:
 A running log of every subtitle file you've generated: which media file it came from, which model and format were used, and when. From here you can reopen the finished subtitle file, jump straight to the folder it was saved in, remove a single entry, or clear the whole history.
 
 <p align="center">
-  <img src="image/Screenshot (67).png" alt="History Log" width="100%">
+  <img src="image/history.png" alt="History Log" width="100%">
 </p>
 
 ### 📊 Telemetry
@@ -142,7 +142,7 @@ A running log of every subtitle file you've generated: which media file it came 
 A live hardware readout — your detected GPU, which compute engine is active (CUDA / Vulkan / CPU), your FFmpeg status, and how much disk space your downloaded AI models are using. Handy for confirming the app is actually using your GPU, and for troubleshooting performance.
 
 <p align="center">
-  <img src="image/Screenshot (68).png" alt="Telemetry Readout" width="100%">
+  <img src="image/telemetry.png" alt="Telemetry Readout" width="100%">
 </p>
 
 ### 📄 Logs
@@ -150,7 +150,7 @@ A live hardware readout — your detected GPU, which compute engine is active (C
 A plain technical event log of what the application has been doing internally (startup checks, detected hardware, backend/device info). You can copy the log to your clipboard or clear it — useful if you ever need to share diagnostic details when reporting a problem.
 
 <p align="center">
-  <img src="image/Screenshot (69).png" alt="Application Logs" width="100%">
+  <img src="image/logs.png" alt="Application Logs" width="100%">
 </p>
 
 ### ❓ Help & Support
@@ -158,7 +158,7 @@ A plain technical event log of what the application has been doing internally (s
 A quick built-in user guide covering how to generate subtitles, how GPU acceleration works (NVIDIA vs AMD/Intel vs CPU-only), and the list of supported input and output formats.
 
 <p align="center">
-  <img src="image/Screenshot (70).png" alt="Help & User Guide" width="100%">
+  <img src="image/help.png" alt="Help & User Guide" width="100%">
 </p>
 
 ### ℹ️ About
@@ -166,7 +166,7 @@ A quick built-in user guide covering how to generate subtitles, how GPU accelera
 Information about the app itself: version number, active compute mode, the core features list, and the underlying technology it's built on (Python, CustomTkinter, faster-whisper/CTranslate2, whisper.cpp, FFmpeg, Bootstrap Icons).
 
 <p align="center">
-  <img src="image/Screenshot (71).png" alt="About SubTranscribe Studio" width="100%">
+  <img src="image/about.png" alt="About SubTranscribe Studio" width="100%">
 </p>
 
 ---
