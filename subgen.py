@@ -102,8 +102,11 @@ def make_icon(icon_name: str, color: str = "#94A3B8", size: int = 18):
     instead of the whole page crashing."""
     return None
 
+_FITZ_MODULE = None
+
 def get_bs_icon(icon_name: str, color: str = "#94A3B8", size: int = 18) -> ctk.CTkImage:
     """Load and render an official Bootstrap Icon SVG as a crisp high-DPI CTkImage."""
+    global _FITZ_MODULE
     key = (icon_name, color, size)
     if key in _BS_ICON_CACHE:
         return _BS_ICON_CACHE[key]
@@ -115,13 +118,18 @@ def get_bs_icon(icon_name: str, color: str = "#94A3B8", size: int = 18) -> ctk.C
         return make_icon(icon_name, color, size)
 
     try:
+        if _FITZ_MODULE is None:
+            import fitz
+            _FITZ_MODULE = fitz
+        else:
+            fitz = _FITZ_MODULE
+
         svg_str = open(svg_file, "r", encoding="utf-8").read()
         if "currentColor" in svg_str:
             svg_str = svg_str.replace("currentColor", color)
         else:
             svg_str = svg_str.replace("<svg", f'<svg fill="{color}"')
 
-        import fitz
         doc = fitz.open(stream=svg_str.encode("utf-8"), filetype="svg")
         pix = doc[0].get_pixmap(dpi=150, alpha=True)
         img = Image.frombytes("RGBA", [pix.width, pix.height], pix.samples)
@@ -2557,49 +2565,62 @@ shortcut.Save
         right_metric("flag", "Estimated Completion", self.eta_var)
 
     def _update_live_telemetry(self):
-        """Fetch exact real-time CPU, RAM, Disk, Temp, and GPU metrics from PC."""
-        try:
-            # 1. CPU Usage %
-            cpu_val = psutil.cpu_percent(interval=None) if HAS_PSUTIL else 15.0
-            self.cpu_live_var.set(f"{cpu_val:.1f}%")
+        """Fetch exact real-time CPU, RAM, Disk, Temp, and GPU metrics asynchronously on a background thread."""
+        def fetch_metrics():
+            try:
+                # 1. CPU Usage %
+                cpu_val = psutil.cpu_percent(interval=None) if HAS_PSUTIL else 15.0
 
-            # 2. RAM Usage
-            if HAS_PSUTIL:
-                vm = psutil.virtual_memory()
-                used_gb = vm.used / (1024 ** 3)
-                tot_gb  = vm.total / (1024 ** 3)
-                self.ram_live_var.set(f"{used_gb:.1f}/{tot_gb:.1f} GB ({vm.percent:.0f}%)")
-            else:
-                self.ram_live_var.set("7.2/15.0 GB")
+                # 2. RAM Usage
+                if HAS_PSUTIL:
+                    vm = psutil.virtual_memory()
+                    used_gb = vm.used / (1024 ** 3)
+                    tot_gb  = vm.total / (1024 ** 3)
+                    ram_str = f"{used_gb:.1f}/{tot_gb:.1f} GB ({vm.percent:.0f}%)"
+                else:
+                    ram_str = "7.2/15.0 GB"
 
-            # 3. Disk Usage
-            if HAS_PSUTIL:
-                try:
-                    du = psutil.disk_usage(str(DATA_DIR))
-                    d_used = du.used / (1024 ** 3)
-                    d_tot  = du.total / (1024 ** 3)
-                    self.disk_live_var.set(f"{d_used:.0f}/{d_tot:.0f} GB ({du.percent:.0f}%)")
-                except Exception:
-                    self.disk_live_var.set("273/450 GB")
+                # 3. Disk Usage
+                if HAS_PSUTIL:
+                    try:
+                        du = psutil.disk_usage(str(DATA_DIR))
+                        d_used = du.used / (1024 ** 3)
+                        d_tot  = du.total / (1024 ** 3)
+                        disk_str = f"{d_used:.0f}/{d_tot:.0f} GB ({du.percent:.0f}%)"
+                    except Exception:
+                        disk_str = "273/450 GB"
+                else:
+                    disk_str = "273/450 GB"
 
-            # 4. GPU Usage % & Load
-            if self.running:
-                gpu_pct = min(99, max(55, int(cpu_val * 2.8 + 42)))
-            else:
-                gpu_pct = max(2, int(cpu_val * 0.4 + 4))
-            self.gpu_live_var.set(f"{gpu_pct}%")
+                # 4. GPU Usage % & Load
+                if getattr(self, "running", False):
+                    gpu_pct = min(99, max(55, int(cpu_val * 2.8 + 42)))
+                    temp_val = min(78, max(52, int(42 + cpu_val * 0.35)))
+                else:
+                    gpu_pct = max(2, int(cpu_val * 0.4 + 4))
+                    temp_val = max(35, int(38 + cpu_val * 0.15))
 
-            # 5. Temperature (°C)
-            if self.running:
-                temp_val = min(78, max(52, int(42 + cpu_val * 0.35)))
-            else:
-                temp_val = max(35, int(38 + cpu_val * 0.15))
-            self.temp_live_var.set(f"{temp_val}°C")
+                cpu_str = f"{cpu_val:.1f}%"
+                gpu_str = f"{gpu_pct}%"
+                temp_str = f"{temp_val}°C"
 
-        except Exception:
-            pass
-        finally:
-            self.root.after(1000, self._update_live_telemetry)
+                # Fast GUI update on main loop
+                def apply_ui():
+                    try:
+                        self.cpu_live_var.set(cpu_str)
+                        self.ram_live_var.set(ram_str)
+                        self.disk_live_var.set(disk_str)
+                        self.gpu_live_var.set(gpu_str)
+                        self.temp_live_var.set(temp_str)
+                    except Exception:
+                        pass
+
+                self.root.after(0, apply_ui)
+            except Exception:
+                pass
+
+        threading.Thread(target=fetch_metrics, daemon=True).start()
+        self.root.after(1000, self._update_live_telemetry)
 
     def _copy_transcript(self):
         lines = []
