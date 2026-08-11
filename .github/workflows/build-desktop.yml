@@ -301,7 +301,7 @@ jobs:
           path: release_assets/raspberrypi
 
       - name: Create Multi-Platform GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: SubTranscribe Studio ${{ github.ref_name }}
           body: |
