@@ -10,9 +10,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest">
-    <img src="https://img.shields.io/github/v/release/mdakashhossain1/SubTranscribe-Studio?label=Download&style=for-the-badge" alt="Download latest release">
-  </a>
+  <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/stargazers"><img src="https://img.shields.io/github/stars/mdakashhossain1/SubTranscribe-Studio?style=for-the-badge&color=gold" alt="GitHub Stars"></a>
+  <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest"><img src="https://img.shields.io/github/v/release/mdakashhossain1/SubTranscribe-Studio?label=Download&style=for-the-badge&color=blue" alt="Download Latest Release"></a>
+  <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mdakashhossain1/SubTranscribe-Studio?style=for-the-badge&color=green" alt="License"></a>
+  <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/issues"><img src="https://img.shields.io/github/issues/mdakashhossain1/SubTranscribe-Studio?style=for-the-badge" alt="Open Issues"></a>
+  <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/network/members"><img src="https://img.shields.io/github/forks/mdakashhossain1/SubTranscribe-Studio?style=for-the-badge" alt="Forks"></a>
 </p>
 
 <p align="center">
@@ -186,3 +188,34 @@ Information about the app itself: version number, active compute mode, the core 
 ## Privacy
 
 All transcription and translation happens locally on your machine using downloaded AI models. Your media files, transcripts, and subtitles are never uploaded anywhere.
+
+---
+
+## 🤝 Contributing
+
+Contributions make the open-source community an amazing place to learn, inspire, and create! Any contributions you make are **greatly appreciated**.
+
+Please see our **[CONTRIBUTING.md](CONTRIBUTING.md)** for details on how to set up your local development environment, propose features, and submit Pull Requests.
+
+Please review our **[Code of Conduct](CODE_OF_CONDUCT.md)** before participating.
+
+---
+
+## 🔒 Security
+
+For security vulnerabilities and disclosure instructions, please see our **[SECURITY.md](SECURITY.md)** policy.
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See **[LICENSE](LICENSE)** for more information.
+
+---
+
+## ⭐ Support & Star History
+
+If you find **SubTranscribe Studio** useful, please consider giving it a ⭐ **Star** on GitHub — it helps the project grow and reach more users!
+
+[![Star History Chart](https://api.star-history.com/svg?repos=mdakashhossain1/SubTranscribe-Studio&type=Date)](https://star-history.com/#mdakashhossain1/SubTranscribe-Studio&Date)
+
