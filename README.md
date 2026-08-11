@@ -25,14 +25,23 @@
 
 ## Download
 
-Grab the latest Windows build from the **[Releases page](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest)** — no Python install required:
+Grab prebuilt desktop applications for **Windows**, **Linux**, and **macOS** from the **[Releases page](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest)** — no Python install required:
 
-- **`SubTranscribe_Studio_Setup_v1.0.0.exe`** — installer (Start Menu shortcut, clean uninstall)
-- **`SubTranscribe-Studio-Windows-Portable.zip`** — unzip and run `SubGen.exe`, no install needed
+### 🪟 Windows (10/11)
+- **`SubTranscribe_Studio_Setup_v1.0.0.exe`** — Installer (Start Menu shortcut & clean uninstaller)
+- **`SubTranscribe-Studio-Windows-Portable.zip`** — Portable bundle (Unzip and run `SubGen.exe`)
 
-> **Seeing a "Windows protected your PC" SmartScreen warning?** That's expected — the installer isn't signed with a paid code-signing certificate (common for small/indie projects), not a sign of anything wrong with the file. Click **More info → Run anyway** to continue.
+### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
+- **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux standalone binary bundle (`./SubGen`)
 
-Every release is built automatically from this repository by [GitHub Actions](.github/workflows/build-windows.yml).
+### 🍎 macOS (MacBook / Mac Intel & Apple Silicon M1/M2/M3/M4)
+- **`SubTranscribe-Studio-macOS-universal.zip`** — macOS desktop app bundle
+
+> **First Run Notes:**
+> - **Windows**: If SmartScreen flags the installer on first run, click **More info → Run anyway**.
+> - **macOS**: On first launch, right-click `SubTranscribeStudio` and click **Open** to approve.
+
+Every release is built automatically for Windows, Linux, and macOS by [GitHub Actions](.github/workflows/build-desktop.yml).
 
 ## What is SubTranscribe Studio?
 

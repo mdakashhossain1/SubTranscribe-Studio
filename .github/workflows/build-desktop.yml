@@ -1,0 +1,266 @@
+name: Build Desktop Applications (Windows, Linux, macOS)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------
+  # 1. WINDOWS BUILD
+  # ---------------------------------------------------------
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Generate app icon from logo.png
+        run: |
+          python -c "from PIL import Image; img = Image.open('assets/logo.png'); img.save('assets/logo.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller
+          --name "SubGen"
+          --windowed
+          --onedir
+          --icon "assets/logo.ico"
+          --collect-all customtkinter
+          --collect-all faster_whisper
+          --collect-all ctranslate2
+          --collect-all deep_translator
+          --collect-all tiktoken
+          --collect-all tokenizers
+          --collect-all sounddevice
+          --collect-all pymupdf
+          --hidden-import tkinter
+          --hidden-import tkinter.filedialog
+          --hidden-import tkinter.messagebox
+          --hidden-import faster_whisper
+          --hidden-import ctranslate2
+          --clean
+          --noconfirm
+          subgen.py
+
+      - name: Bundle runtime assets
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse -Force assets dist/SubGen/assets
+          if (Test-Path bin) { Copy-Item -Recurse -Force bin dist/SubGen/bin }
+
+      - name: Zip portable build
+        shell: pwsh
+        run: Compress-Archive -Path dist/SubGen/* -DestinationPath SubTranscribe-Studio-Windows-Portable.zip
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubTranscribe-Studio-Windows
+          path: |
+            SubTranscribe-Studio-Windows-Portable.zip
+            dist/SubTranscribe_Studio_Setup_*.exe
+
+  # ---------------------------------------------------------
+  # 2. LINUX BUILD
+  # ---------------------------------------------------------
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk portaudio19-dev libasound2-dev libx11-dev ffmpeg
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Linux Binary with PyInstaller
+        run: |
+          pyinstaller \
+            --name "SubGen" \
+            --onedir \
+            --collect-all customtkinter \
+            --collect-all faster_whisper \
+            --collect-all ctranslate2 \
+            --collect-all deep_translator \
+            --collect-all tiktoken \
+            --collect-all tokenizers \
+            --collect-all sounddevice \
+            --collect-all pymupdf \
+            --hidden-import tkinter \
+            --clean \
+            --noconfirm \
+            subgen.py
+
+      - name: Bundle Linux runtime assets & Compress
+        run: |
+          cp -r assets dist/SubGen/assets
+          if [ -d "bin" ]; then cp -r bin dist/SubGen/bin; fi
+          tar -czvf SubTranscribe-Studio-Linux-x86_64.tar.gz -C dist/SubGen .
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubTranscribe-Studio-Linux
+          path: SubTranscribe-Studio-Linux-x86_64.tar.gz
+
+  # ---------------------------------------------------------
+  # 3. MACOS BUILD (MacBook / Mac OS)
+  # ---------------------------------------------------------
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build macOS App Bundle with PyInstaller
+        run: |
+          pyinstaller \
+            --name "SubTranscribeStudio" \
+            --windowed \
+            --onedir \
+            --collect-all customtkinter \
+            --collect-all faster_whisper \
+            --collect-all ctranslate2 \
+            --collect-all deep_translator \
+            --collect-all tiktoken \
+            --collect-all tokenizers \
+            --collect-all sounddevice \
+            --collect-all pymupdf \
+            --hidden-import tkinter \
+            --clean \
+            --noconfirm \
+            subgen.py
+
+      - name: Bundle macOS runtime assets & Zip
+        run: |
+          cp -r assets dist/SubTranscribeStudio/assets
+          if [ -d "bin" ]; then cp -r bin dist/SubTranscribeStudio/bin; fi
+          cd dist && zip -r ../SubTranscribe-Studio-macOS-universal.zip SubTranscribeStudio
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubTranscribe-Studio-macOS
+          path: SubTranscribe-Studio-macOS-universal.zip
+
+  # ---------------------------------------------------------
+  # 4. PUBLISH MULTI-PLATFORM GITHUB RELEASE
+  # ---------------------------------------------------------
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: SubTranscribe-Studio-Windows
+          path: release_assets/windows
+
+      - name: Download Linux Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: SubTranscribe-Studio-Linux
+          path: release_assets/linux
+
+      - name: Download macOS Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: SubTranscribe-Studio-macOS
+          path: release_assets/macos
+
+      - name: Create Multi-Platform GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: SubTranscribe Studio ${{ github.ref_name }}
+          body: |
+            ## 🚀 SubTranscribe Studio ${{ github.ref_name }}
+
+            **Cross-Platform, local, private, AI-powered subtitle generator, translator & audio intelligence studio**
+
+            ---
+
+            ### 📦 Multi-Platform Download & Installation Assets
+
+            #### 🪟 Windows (10/11)
+            - **`SubTranscribe_Studio_Setup_v1.0.0.exe`** — Windows Installer *(Recommended: Start Menu shortcut & clean uninstaller)*
+            - **`SubTranscribe-Studio-Windows-Portable.zip`** — Windows Portable Bundle *(Unzip and run `SubGen.exe`)*
+
+            #### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
+            - **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux Binary Bundle *(Extract and run `./SubGen`)*
+
+            #### 🍎 macOS (MacBook / Mac Intel & Apple Silicon M1/M2/M3/M4)
+            - **`SubTranscribe-Studio-macOS-universal.zip`** — macOS Desktop Bundle *(Unzip and open `SubTranscribeStudio`)*
+
+            ---
+
+            ### ✨ Key Features across all Platforms
+
+            - 🔒 **100% Private & Offline**: Speech recognition and translation run completely locally on your PC.
+            - ⚡ **Cross-Platform Hardware Acceleration**: NVIDIA CUDA, AMD/Intel Vulkan, or CPU quantized inference.
+            - 🎙️ **Multi-Format Subtitle Export**: Save as **SRT**, **WebVTT**, **ASS (SubStation Alpha)**, or plain **TXT**.
+            - 🌐 **100+ Languages**: Automatic language detection and translation support.
+            - 📼 **Batch Processing**: Queue up and process multiple audio/video files automatically.
+            - 🎛️ **Live Waveform & Subtitle Studio**: Synchronized waveform audio player with real-time subtitle editing.
+
+            ---
+
+            > **💡 First Run Notes**: 
+            > - **Windows**: If SmartScreen flags the unsigned executable, click **More info → Run anyway**.
+            > - **macOS**: On first launch, if macOS Gatekeeper flags unverified developer, right-click `SubTranscribeStudio` and click **Open**.
+          files: |
+            release_assets/windows/SubTranscribe-Studio-Windows-Portable.zip
+            release_assets/windows/SubTranscribe_Studio_Setup_*.exe
+            release_assets/linux/SubTranscribe-Studio-Linux-x86_64.tar.gz
+            release_assets/macos/SubTranscribe-Studio-macOS-universal.zip
+          generate_release_notes: true
