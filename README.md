@@ -18,10 +18,6 @@
 </p>
 
 <p align="center">
-  <video src="image/demo.mp4" poster="image/dashboard.png" width="100%" autoplay loop muted playsinline></video>
-</p>
-
-<p align="center">
   <img src="image/demo.gif" alt="SubTranscribe Studio Live Video Demo" width="100%">
 </p>
 
