@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 User Support & FAQ
+    url: https://github.com/mdakashhossain1/SubTranscribe-Studio/blob/main/.github/SUPPORT.md
+    about: Please check our support guide before submitting new issue reports.
+  - name: 🔒 Security Vulnerability Report
+    url: https://github.com/mdakashhossain1/SubTranscribe-Studio/blob/main/.github/SECURITY.md
+    about: Report security vulnerabilities privately.

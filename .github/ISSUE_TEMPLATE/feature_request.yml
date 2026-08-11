@@ -1,0 +1,31 @@
+name: 💡 Feature Request
+description: Suggest an idea or feature enhancement for SubTranscribe Studio
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for suggesting a feature for SubTranscribe Studio!
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Describe the feature you would like to see added.
+      placeholder: I would like to suggest...
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case / Motivation
+      description: Why is this feature valuable to you and other users?
+      placeholder: This feature helps when...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions?
+    validations:
+      required: false
