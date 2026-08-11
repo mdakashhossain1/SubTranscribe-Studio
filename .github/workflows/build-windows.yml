@@ -85,6 +85,33 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: SubTranscribe Studio ${{ github.ref_name }}
+          body: |
+            ## 🚀 SubTranscribe Studio ${{ github.ref_name }}
+
+            **Local, private, AI-powered subtitle generator, translator & audio intelligence studio**
+
+            ---
+
+            ### 📦 Downloads & Installation Assets
+
+            - **`SubTranscribe_Studio_Setup_v1.0.0.exe`** — Windows Setup Installer *(Recommended: creates Start Menu shortcut & clean uninstaller)*
+            - **`SubTranscribe-Studio-Windows-Portable.zip`** — Portable Standalone Bundle *(Unzip and double-click `SubGen.exe`)*
+
+            ---
+
+            ### ✨ Highlights & Features
+
+            - 🔒 **100% Private & Offline**: Speech recognition and translation run completely locally on your PC.
+            - ⚡ **Hardware Accelerated**: Automatically utilizes NVIDIA CUDA (GPU), AMD/Intel Vulkan, or CPU quantized inference.
+            - 🎙️ **Multi-Format Subtitle Export**: Save as **SRT**, **WebVTT**, **ASS (SubStation Alpha)**, or plain **TXT**.
+            - 🌐 **100+ Languages**: Automatic language detection and translation support.
+            - 📼 **Batch Processing**: Queue up and process multiple audio/video files automatically.
+            - 🎛️ **Live Waveform & Subtitle Studio**: Synchronized waveform audio player with real-time subtitle verification & inline editor.
+
+            ---
+
+            > **💡 Windows SmartScreen Notice**: If Windows flags the installer as an unrecognized publisher on first run, click **More info → Run anyway** to proceed.
           files: |
             SubTranscribe-Studio-Windows-Portable.zip
             dist/SubTranscribe_Studio_Setup_*.exe
