@@ -191,10 +191,85 @@ jobs:
           path: SubTranscribe-Studio-macOS-universal.zip
 
   # ---------------------------------------------------------
-  # 4. PUBLISH MULTI-PLATFORM GITHUB RELEASE
+  # 4. RASPBERRY PI OS / LINUX ARM64 BUILD
+  # ---------------------------------------------------------
+  build-raspberry-pi:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk portaudio19-dev libasound2-dev libx11-dev ffmpeg
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build ARM64 Binary with PyInstaller
+        run: |
+          pyinstaller \
+            --name "SubGen" \
+            --onedir \
+            --collect-all customtkinter \
+            --collect-all faster_whisper \
+            --collect-all ctranslate2 \
+            --collect-all deep_translator \
+            --collect-all tiktoken \
+            --collect-all tokenizers \
+            --collect-all sounddevice \
+            --collect-all pymupdf \
+            --hidden-import tkinter \
+            --clean \
+            --noconfirm \
+            subgen.py
+
+      - name: Bundle Raspberry Pi runtime assets & Compress
+        run: |
+          cp -r assets dist/SubGen/assets
+          if [ -d "bin" ]; then cp -r bin dist/SubGen/bin; fi
+          tar -czvf SubTranscribe-Studio-RaspberryPi-arm64.tar.gz -C dist/SubGen .
+
+      - name: Upload Raspberry Pi Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubTranscribe-Studio-RaspberryPi
+          path: SubTranscribe-Studio-RaspberryPi-arm64.tar.gz
+
+  # ---------------------------------------------------------
+  # 5. DOCKER CONTAINER BUILD TEST
+  # ---------------------------------------------------------
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: subtranscribe-studio:latest
+
+  # ---------------------------------------------------------
+  # 6. PUBLISH MULTI-PLATFORM GITHUB RELEASE
   # ---------------------------------------------------------
   release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-macos, build-raspberry-pi, build-docker]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -219,6 +294,12 @@ jobs:
           name: SubTranscribe-Studio-macOS
           path: release_assets/macos
 
+      - name: Download Raspberry Pi Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: SubTranscribe-Studio-RaspberryPi
+          path: release_assets/raspberrypi
+
       - name: Create Multi-Platform GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -239,14 +320,20 @@ jobs:
             #### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
             - **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux Binary Bundle *(Extract and run `./SubGen`)*
 
+            #### 🍓 Raspberry Pi OS & ARM64 Linux (Raspberry Pi 4 / 5)
+            - **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** — ARM64 Linux Bundle *(Extract and run `./SubGen`)*
+
             #### 🍎 macOS (MacBook / Mac Intel & Apple Silicon M1/M2/M3/M4)
             - **`SubTranscribe-Studio-macOS-universal.zip`** — macOS Desktop Bundle *(Unzip and open `SubTranscribeStudio`)*
+
+            #### 🐳 Docker Container (NAS / Unraid / Synology / Linux Server)
+            - Run with Docker: `docker compose up -d` or `docker build -t subtranscribe-studio .`
 
             ---
 
             ### ✨ Key Features across all Platforms
 
-            - 🔒 **100% Private & Offline**: Speech recognition and translation run completely locally on your PC.
+            - 🔒 **100% Private & Offline**: Speech recognition and translation run completely locally on your machine.
             - ⚡ **Cross-Platform Hardware Acceleration**: NVIDIA CUDA, AMD/Intel Vulkan, or CPU quantized inference.
             - 🎙️ **Multi-Format Subtitle Export**: Save as **SRT**, **WebVTT**, **ASS (SubStation Alpha)**, or plain **TXT**.
             - 🌐 **100+ Languages**: Automatic language detection and translation support.
@@ -262,5 +349,6 @@ jobs:
             release_assets/windows/SubTranscribe-Studio-Windows-Portable.zip
             release_assets/windows/SubTranscribe_Studio_Setup_*.exe
             release_assets/linux/SubTranscribe-Studio-Linux-x86_64.tar.gz
+            release_assets/raspberrypi/SubTranscribe-Studio-RaspberryPi-arm64.tar.gz
             release_assets/macos/SubTranscribe-Studio-macOS-universal.zip
           generate_release_notes: true

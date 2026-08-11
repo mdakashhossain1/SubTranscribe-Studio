@@ -23,9 +23,9 @@
 
 ---
 
-## Download
+## Download & Deployment
 
-Grab prebuilt desktop applications for **Windows**, **Linux**, and **macOS** from the **[Releases page](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest)** — no Python install required:
+Grab prebuilt applications for **Windows**, **Linux**, **macOS**, **Raspberry Pi**, and **Docker** from the **[Releases page](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest)** — no Python install required:
 
 ### 🪟 Windows (10/11)
 - **`SubTranscribe_Studio_Setup_v1.0.0.exe`** — Installer (Start Menu shortcut & clean uninstaller)
@@ -34,14 +34,27 @@ Grab prebuilt desktop applications for **Windows**, **Linux**, and **macOS** fro
 ### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
 - **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux standalone binary bundle (`./SubGen`)
 
+### 🍓 Raspberry Pi OS (Raspberry Pi 4 / 5 - ARM64 Linux)
+- **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** — ARM64 Linux standalone bundle (`./SubGen`)
+
 ### 🍎 macOS (MacBook / Mac Intel & Apple Silicon M1/M2/M3/M4)
 - **`SubTranscribe-Studio-macOS-universal.zip`** — macOS desktop app bundle
+
+### 🐳 Docker Container (Synology NAS / Unraid / TrueNAS / Linux Server)
+Run locally in Docker with 1 command:
+```bash
+docker compose up -d
+```
+Or build custom Docker image:
+```bash
+docker build -t subtranscribe-studio .
+```
 
 > **First Run Notes:**
 > - **Windows**: If SmartScreen flags the installer on first run, click **More info → Run anyway**.
 > - **macOS**: On first launch, right-click `SubTranscribeStudio` and click **Open** to approve.
 
-Every release is built automatically for Windows, Linux, and macOS by [GitHub Actions](.github/workflows/build-desktop.yml).
+Every release is built automatically for Windows, Linux, macOS, Raspberry Pi, and Docker by [GitHub Actions](.github/workflows/build-desktop.yml).
 
 ## What is SubTranscribe Studio?
 

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  subtranscribe-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: subtranscribe-studio
+    restart: unless-stopped
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      - ./media:/app/media
+      - ./subtitles:/app/subtitles
+      - ./models:/root/.cache/huggingface
+    network_mode: host
