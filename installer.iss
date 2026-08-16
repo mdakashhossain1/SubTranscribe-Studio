@@ -60,12 +60,14 @@ var
 
 function InitializeUninstall(): Boolean;
 var
-  Form: TSetupForm;
-  Lbl: TNewStaticText;
-  ChkModels, ChkHistory: TNewCheckBox;
-  BtnUninstall, BtnCancel: TNewButton;
   DataDir, ModelsDir, HistFile: String;
 begin
+  // A custom TSetupForm-based checkbox dialog was tried here first, but
+  // TSetupForm is only backed by a resource embedded in the *installer*
+  // executable — the separate uninstaller stub doesn't have it, so it
+  // compiled fine but failed at runtime with "Resource TSetupForm not
+  // found." Sequential MsgBox prompts have no such resource dependency
+  // and are guaranteed available in both install and uninstall contexts.
   Result := True;      // proceed with a normal uninstall by default
   RemoveModels := False;
   RemoveHistory := False;
@@ -74,75 +76,11 @@ begin
   ModelsDir := DataDir + '\models';
   HistFile := DataDir + '\history.json';
 
-  // Nothing extra on disk to offer removing — just do a normal uninstall.
-  if not DirExists(ModelsDir) and not FileExists(HistFile) then
-    Exit;
+  if DirExists(ModelsDir) then
+    RemoveModels := (MsgBox('Also permanently delete the downloaded AI models (can be several GB)?', mbConfirmation, MB_YESNO) = idYes);
 
-  Form := TSetupForm.Create(nil);
-  try
-    Form.ClientWidth := ScaleX(420);
-    Form.ClientHeight := ScaleY(210);
-    Form.Caption := 'Uninstall SubTranscribe Studio';
-    Form.Position := poScreenCenter;
-
-    Lbl := TNewStaticText.Create(Form);
-    Lbl.Parent := Form;
-    Lbl.Left := ScaleX(16);
-    Lbl.Top := ScaleY(12);
-    Lbl.Width := Form.ClientWidth - ScaleX(32);
-    Lbl.AutoSize := False;
-    Lbl.WordWrap := True;
-    Lbl.Height := ScaleY(48);
-    Lbl.Caption := 'The application will now be removed. Anything left unchecked below stays on your PC untouched — check only what you also want permanently deleted:';
-
-    ChkModels := TNewCheckBox.Create(Form);
-    ChkModels.Parent := Form;
-    ChkModels.Left := ScaleX(24);
-    ChkModels.Top := ScaleY(68);
-    ChkModels.Width := Form.ClientWidth - ScaleX(48);
-    ChkModels.Caption := 'Downloaded AI models (can be several GB)';
-    ChkModels.Checked := False;
-    ChkModels.Enabled := DirExists(ModelsDir);
-
-    ChkHistory := TNewCheckBox.Create(Form);
-    ChkHistory.Parent := Form;
-    ChkHistory.Left := ScaleX(24);
-    ChkHistory.Top := ScaleY(96);
-    ChkHistory.Width := Form.ClientWidth - ScaleX(48);
-    ChkHistory.Caption := 'Transcription history log';
-    ChkHistory.Checked := False;
-    ChkHistory.Enabled := FileExists(HistFile);
-
-    BtnUninstall := TNewButton.Create(Form);
-    BtnUninstall.Parent := Form;
-    BtnUninstall.Width := ScaleX(100);
-    BtnUninstall.Height := ScaleY(23);
-    BtnUninstall.Left := Form.ClientWidth - ScaleX(216);
-    BtnUninstall.Top := Form.ClientHeight - ScaleY(32);
-    BtnUninstall.Caption := 'Uninstall';
-    BtnUninstall.ModalResult := mrOk;
-    Form.ActiveControl := BtnUninstall;
-
-    BtnCancel := TNewButton.Create(Form);
-    BtnCancel.Parent := Form;
-    BtnCancel.Width := ScaleX(100);
-    BtnCancel.Height := ScaleY(23);
-    BtnCancel.Left := Form.ClientWidth - ScaleX(108);
-    BtnCancel.Top := Form.ClientHeight - ScaleY(32);
-    BtnCancel.Caption := 'Cancel';
-    BtnCancel.ModalResult := mrCancel;
-
-    if Form.ShowModal() = mrOk then
-    begin
-      RemoveModels := ChkModels.Checked;
-      RemoveHistory := ChkHistory.Checked;
-      Result := True;
-    end
-    else
-      Result := False;  // user cancelled — abort the uninstall entirely
-  finally
-    Form.Free();
-  end;
+  if FileExists(HistFile) then
+    RemoveHistory := (MsgBox('Also permanently delete the transcription history log?', mbConfirmation, MB_YESNO) = idYes);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
