@@ -2180,6 +2180,24 @@ shortcut.Save
         ctk.CTkLabel(st_f, text=f"Active Compute Mode: {DEVICE_LABEL}   •   Engine: {BACKEND or 'Native'}   •   Precision: {COMPUTE_TYPE}",
                      font=ctk.CTkFont(FONT_FAMILY, 12, "bold"), text_color=SUCCESS).pack(side="left")
 
+        # ── Update checker — explicit, always-visible entry point. The
+        # startup check (_check_for_update_bg) is silent when already on the
+        # latest version, which makes the feature invisible/undiscoverable
+        # unless an update actually happens to be available at launch. This
+        # gives a manual button with feedback either way.
+        upd_row = ctk.CTkFrame(hero, fg_color="transparent")
+        upd_row.pack(fill="x", padx=24, pady=(0, 16))
+        self.update_status_var = tk.StringVar(value=f"Current version: v{APP_VER}")
+        ctk.CTkLabel(upd_row, textvariable=self.update_status_var, text_color=TEXT_SUB,
+                     font=ctk.CTkFont(FONT_FAMILY, 12)).pack(side="left")
+        chk_ic = get_bs_icon("arrow-repeat", color="#FFFFFF", size=14)
+        self.check_update_btn = ctk.CTkButton(upd_row, text="Check for Updates", image=chk_ic, width=170, height=32,
+                                              corner_radius=6, fg_color=INPUT_BG, border_width=1, border_color=BORDER_COLOR,
+                                              text_color=TEXT_MAIN, hover_color=BORDER_COLOR,
+                                              font=ctk.CTkFont(FONT_FAMILY, 12, "bold"),
+                                              command=self._manual_check_for_update)
+        self.check_update_btn.pack(side="left", padx=(10, 0))
+
         # ── Core Features Grid
         feat_card = self._card(container, "Core Features & Capabilities", icon_name="rocket-takeoff-fill")
 
@@ -2699,6 +2717,34 @@ shortcut.Save
         for w in (self.ver_badge, self.ver_badge_lbl):
             w.bind("<Button-1>", lambda e: webbrowser.open(self._update_url))
             w.configure(cursor="hand2")
+
+    def _manual_check_for_update(self):
+        """Explicit "Check for Updates" button on the About page — gives
+        feedback either way (unlike the silent startup check), so the
+        feature is actually visible/discoverable when nothing's new."""
+        if hasattr(self, "check_update_btn"):
+            self.check_update_btn.configure(state="disabled")
+        if hasattr(self, "update_status_var"):
+            self.update_status_var.set("Checking for updates…")
+        threading.Thread(target=self._manual_check_for_update_bg, daemon=True).start()
+
+    def _manual_check_for_update_bg(self):
+        found = check_for_update()
+        self.root.after(0, self._apply_manual_update_result, found)
+
+    def _apply_manual_update_result(self, found):
+        if hasattr(self, "check_update_btn"):
+            self.check_update_btn.configure(state="normal")
+        if not hasattr(self, "update_status_var"):
+            return
+        if found:
+            latest, url = found
+            self._apply_update_badge(latest, url)
+            self.update_status_var.set(f"Update available: v{latest}  (you're on v{APP_VER})")
+            self.check_update_btn.configure(text="Download Update",
+                                            command=lambda: webbrowser.open(url))
+        else:
+            self.update_status_var.set(f"You're on the latest version (v{APP_VER}).")
 
     def _start_live_telemetry(self):
         """Start the CPU/RAM/Disk/GPU telemetry poller as a single persistent
