@@ -19,6 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set version from tag
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          if ([string]::IsNullOrWhiteSpace($ver)) { $ver = "0.0.0-dev" }
+          Set-Content -Path VERSION -Value $ver -NoNewline
+          echo "APP_VERSION=$ver" >> $env:GITHUB_ENV
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -63,6 +71,7 @@ jobs:
         run: |
           Copy-Item -Recurse -Force assets dist/SubGen/assets
           if (Test-Path bin) { Copy-Item -Recurse -Force bin dist/SubGen/bin }
+          Copy-Item -Force VERSION dist/SubGen/VERSION
 
       - name: Zip portable build
         shell: pwsh
@@ -92,6 +101,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set version from tag
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          if [ -z "$VER" ]; then VER="0.0.0-dev"; fi
+          printf '%s' "$VER" > VERSION
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -131,6 +146,7 @@ jobs:
         run: |
           cp -r assets dist/SubGen/assets
           if [ -d "bin" ]; then cp -r bin dist/SubGen/bin; fi
+          cp VERSION dist/SubGen/VERSION
           tar -czvf SubTranscribe-Studio-Linux-x86_64.tar.gz -C dist/SubGen .
 
       - name: Upload Linux Artifacts
@@ -147,6 +163,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set version from tag
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          if [ -z "$VER" ]; then VER="0.0.0-dev"; fi
+          printf '%s' "$VER" > VERSION
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -182,6 +204,7 @@ jobs:
         run: |
           cp -r assets dist/SubTranscribeStudio/assets
           if [ -d "bin" ]; then cp -r bin dist/SubTranscribeStudio/bin; fi
+          cp VERSION dist/SubTranscribeStudio/VERSION
           cd dist && zip -r ../SubTranscribe-Studio-macOS-universal.zip SubTranscribeStudio
 
       - name: Upload macOS Artifacts
@@ -198,6 +221,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set version from tag
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          if [ -z "$VER" ]; then VER="0.0.0-dev"; fi
+          printf '%s' "$VER" > VERSION
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -237,6 +266,7 @@ jobs:
         run: |
           cp -r assets dist/SubGen/assets
           if [ -d "bin" ]; then cp -r bin dist/SubGen/bin; fi
+          cp VERSION dist/SubGen/VERSION
           tar -czvf SubTranscribe-Studio-RaspberryPi-arm64.tar.gz -C dist/SubGen .
 
       - name: Upload Raspberry Pi Artifacts
@@ -314,7 +344,7 @@ jobs:
             ### 📦 Multi-Platform Download & Installation Assets
 
             #### 🪟 Windows (10/11)
-            - **`SubTranscribe_Studio_Setup_v1.0.0.exe`** — Windows Installer *(Recommended: Start Menu shortcut & clean uninstaller)*
+            - **`SubTranscribe_Studio_Setup_${{ github.ref_name }}.exe`** — Windows Installer *(Recommended: Start Menu shortcut & clean uninstaller)*
             - **`SubTranscribe-Studio-Windows-Portable.zip`** — Windows Portable Bundle *(Unzip and run `SubGen.exe`)*
 
             #### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)

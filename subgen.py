@@ -9,11 +9,14 @@ FFmpeg path auto-detected from CapCut or system PATH.
 import os
 import sys
 import re
+import json
 import threading
 import time
 import subprocess
 import shutil
 import tempfile
+import urllib.request
+import webbrowser
 from pathlib import Path
 from datetime import timedelta
 
@@ -161,9 +164,49 @@ if HAS_CTK:
             except Exception:
                 pass
 
+def _load_app_version() -> str:
+    """Single source of truth for the app version: a plain-text VERSION file
+    at the project root. CI writes the real release version into it (from the
+    git tag) before each build, so this file — not a literal in source — is
+    what ever needs updating. Falls back to "dev" for a raw source checkout
+    where no VERSION file has been generated yet."""
+    try:
+        return (PROJECT_DIR / "VERSION").read_text(encoding="utf-8").strip() or "dev"
+    except Exception:
+        return "dev"
+
+GITHUB_REPO = "mdakashhossain1/SubTranscribe-Studio"
+
+def _version_tuple(v: str):
+    parts = []
+    for p in re.split(r"[.\-+]", v):
+        m = re.match(r"\d+", p)
+        parts.append(int(m.group()) if m else 0)
+    return tuple(parts)
+
+def check_for_update(timeout=4):
+    """Query the GitHub Releases API for the latest published release.
+    Returns (latest_version, release_url) if it's newer than APP_VER, else
+    None. Never raises — offline/rate-limited/blocked requests are silent
+    no-ops so this can't affect app startup or stability."""
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+            headers={"Accept": "application/vnd.github+json", "User-Agent": "SubTranscribe-Studio"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.load(resp)
+        latest = str(data.get("tag_name", "")).lstrip("vV").strip()
+        url = data.get("html_url") or f"https://github.com/{GITHUB_REPO}/releases/latest"
+        if latest and _version_tuple(latest) > _version_tuple(APP_VER):
+            return latest, url
+    except Exception:
+        pass
+    return None
+
 # ── Constants (Linear Dark Design System Tokens)
 APP_NAME     = "SubTranscribe"
-APP_VER      = "1.0"
+APP_VER      = _load_app_version()
 DARK_BG      = "#090D16"  # Deep space dark canvas
 PANEL_BG     = "#131825"  # Card / panel container surface
 CARD_BG      = "#131825"  # Studio card background
@@ -1210,11 +1253,15 @@ class SubGenApp:
         ctk.CTkLabel(hdr, text=APP_NAME, font=ctk.CTkFont(FONT_FAMILY, 15, "bold"),
                      text_color=TEXT_MAIN).pack(side="left")
 
-        ver_badge = ctk.CTkFrame(hdr, fg_color=INPUT_BG, corner_radius=5,
-                                 border_width=1, border_color=BORDER_COLOR)
-        ver_badge.pack(side="left", padx=(6, 0))
-        ctk.CTkLabel(ver_badge, text=f"v{APP_VER}", font=ctk.CTkFont(FONT_FAMILY, 9, "bold"),
-                     text_color=ACCENT_CYAN).pack(padx=5, pady=1)
+        self.ver_badge = ctk.CTkFrame(hdr, fg_color=INPUT_BG, corner_radius=5,
+                                      border_width=1, border_color=BORDER_COLOR)
+        self.ver_badge.pack(side="left", padx=(6, 0))
+        self.ver_badge_lbl = ctk.CTkLabel(self.ver_badge, text=f"v{APP_VER}",
+                                          font=ctk.CTkFont(FONT_FAMILY, 9, "bold"),
+                                          text_color=ACCENT_CYAN)
+        self.ver_badge_lbl.pack(padx=5, pady=1)
+        self._update_url = None
+        threading.Thread(target=self._check_for_update_bg, daemon=True).start()
 
         # Navigation Items List (Official Bootstrap Icons)
         nav_items = [
@@ -2595,6 +2642,23 @@ shortcut.Save
 
         right_metric("stopwatch", "Elapsed", self.elapsed_var)
         right_metric("flag", "Estimated Completion", self.eta_var)
+
+    def _check_for_update_bg(self):
+        """Runs on a background thread at startup. Silently does nothing if
+        offline or already on the latest version — only touches the UI (via
+        root.after) when a newer GitHub release actually exists."""
+        found = check_for_update()
+        if found:
+            latest, url = found
+            self.root.after(0, self._apply_update_badge, latest, url)
+
+    def _apply_update_badge(self, latest_version, url):
+        self._update_url = url
+        self.ver_badge.configure(fg_color=WARNING, border_color=WARNING)
+        self.ver_badge_lbl.configure(text=f"Update v{latest_version} available", text_color="#0A0E17")
+        for w in (self.ver_badge, self.ver_badge_lbl):
+            w.bind("<Button-1>", lambda e: webbrowser.open(self._update_url))
+            w.configure(cursor="hand2")
 
     def _update_live_telemetry(self):
         """Fetch exact real-time CPU, RAM, Disk, Temp, and GPU metrics asynchronously on a background thread."""

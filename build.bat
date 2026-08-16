@@ -10,6 +10,12 @@ set PIP=%VENV%\Scripts\pip.exe
 set PYTHON=%VENV%\Scripts\python.exe
 set PYINSTALLER=%VENV%\Scripts\pyinstaller.exe
 
+:: Version comes from the VERSION file (single source of truth — see
+:: subgen.py's _load_app_version() and installer.iss's MyAppVersion).
+set VER=dev
+if exist "%~dp0VERSION" set /p VER=<"%~dp0VERSION"
+set APP_VERSION=%VER%
+
 :: Install PyInstaller if missing
 if not exist "%PYINSTALLER%" (
     echo Installing PyInstaller into local venv...
@@ -71,6 +77,7 @@ echo Copying assets and binaries...
 xcopy /E /I /Y "%~dp0assets" "%~dp0dist\SubGen\assets" >nul 2>&1
 if exist "%~dp0bin" xcopy /E /I /Y "%~dp0bin" "%~dp0dist\SubGen\bin" >nul 2>&1
 if exist "%~dp0whisper.cpp" xcopy /E /I /Y "%~dp0whisper.cpp" "%~dp0dist\SubGen\whisper.cpp" >nul 2>&1
+copy /Y "%~dp0VERSION" "%~dp0dist\SubGen\VERSION" >nul 2>&1
 
 :: Create Desktop Shortcut helper VBScript in dist\SubGen
 (
@@ -113,7 +120,7 @@ if not exist %ISCC% set ISCC="C:\Program Files\Inno Setup 6\ISCC.exe"
 
 if exist %ISCC% (
     echo.
-    echo Compiling Inno Setup Installer SubTranscribe_Studio_Setup_v1.0.0.exe...
+    echo Compiling Inno Setup Installer SubTranscribe_Studio_Setup_v%VER%.exe...
     %ISCC% "%~dp0installer.iss"
 )
 
@@ -131,7 +138,7 @@ echo  3. Complete Uninstall & Model Cleanup Script:
 echo     dist\SubGen\Uninstall_SubTranscribe.bat
 if exist %ISCC% (
 echo  4. Windows Setup Installer (With Desktop Icon Checkbox & Full Cleanup Prompt):
-echo     dist\SubTranscribe_Studio_Setup_v1.0.0.exe
+echo     dist\SubTranscribe_Studio_Setup_v%VER%.exe
 )
 echo ============================================
 pause

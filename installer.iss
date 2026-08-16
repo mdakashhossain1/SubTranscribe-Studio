@@ -1,6 +1,12 @@
 ; Script generated for SubTranscribe Studio Enterprise Edition
 #define MyAppName "SubTranscribe Studio"
-#define MyAppVersion "1.0.0"
+; Version comes from the APP_VERSION env var, set by CI from the git tag
+; (see .github/workflows/build-desktop.yml). Falls back to 0.0.0-dev for a
+; local manual compile where that env var isn't set.
+#define MyAppVersion GetEnv("APP_VERSION")
+#if MyAppVersion == ""
+  #define MyAppVersion "0.0.0-dev"
+#endif
 #define MyAppPublisher "SubTranscribe AI"
 #define MyAppExeName "SubGen.exe"
 
@@ -13,7 +19,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=dist
-OutputBaseFilename=SubTranscribe_Studio_Setup_v1.0.0
+OutputBaseFilename=SubTranscribe_Studio_Setup_v{#MyAppVersion}
 SetupIconFile=assets\logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
