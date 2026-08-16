@@ -83,6 +83,13 @@ jobs:
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          # Copy the compiled installer up to the workspace root so both
+          # upload paths below share the same base directory — with entries
+          # split across two different directories (repo root vs dist/),
+          # upload-artifact uses their lowest common ancestor as the
+          # artifact root, which nests the .exe under a dist/ subfolder and
+          # makes the release job's flat glob fail to find it silently.
+          Copy-Item -Force dist\SubTranscribe_Studio_Setup_*.exe .
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -90,7 +97,7 @@ jobs:
           name: SubTranscribe-Studio-Windows
           path: |
             SubTranscribe-Studio-Windows-Portable.zip
-            dist/SubTranscribe_Studio_Setup_*.exe
+            SubTranscribe_Studio_Setup_*.exe
 
   # ---------------------------------------------------------
   # 2. LINUX BUILD
