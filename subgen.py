@@ -2006,9 +2006,9 @@ shortcut.Save
 
         grid = ctk.CTkFrame(card, fg_color="transparent"); grid.pack(fill="x", padx=16, pady=(0, 14))
 
-        def tel_card(icon_name, label, value, subtext, color=ACCENT_CYAN):
+        def tel_card(parent_grid, icon_name, label, value, subtext, color=ACCENT_CYAN, textvariable=None):
             ic = get_bs_icon(icon_name, color="#06B6D4", size=18)
-            f = ctk.CTkFrame(grid, fg_color=INPUT_BG, corner_radius=10,
+            f = ctk.CTkFrame(parent_grid, fg_color=INPUT_BG, corner_radius=10,
                              border_width=1, border_color=BORDER_COLOR)
             f.pack(side="left", expand=True, fill="x", padx=4, pady=4)
             lbl_f = ctk.CTkFrame(f, fg_color="transparent")
@@ -2017,16 +2017,32 @@ shortcut.Save
                 ctk.CTkLabel(lbl_f, text="", image=ic).pack(side="left", padx=(0, 6))
             ctk.CTkLabel(lbl_f, text=label, text_color=TEXT_SUB,
                          font=ctk.CTkFont(FONT_FAMILY, 12, "bold")).pack(side="left")
-            ctk.CTkLabel(f, text=value, text_color=color,
-                         font=ctk.CTkFont(FONT_FAMILY, 20, "bold")).pack(anchor="w", padx=14, pady=(3, 0))
+            val_lbl = ctk.CTkLabel(f, text=value if textvariable is None else "", text_color=color,
+                                   font=ctk.CTkFont(FONT_FAMILY, 20, "bold"))
+            if textvariable is not None:
+                val_lbl.configure(textvariable=textvariable)
+            val_lbl.pack(anchor="w", padx=14, pady=(3, 0))
             ctk.CTkLabel(f, text=subtext, text_color=TEXT_SUB,
                          font=ctk.CTkFont(FONT_FAMILY, 11)).pack(anchor="w", padx=14, pady=(0, 12))
 
         gpu_val = GPU_NAME or ("CUDA Available" if DEVICE == "cuda" else "High-Speed CPU Engine")
-        tel_card("cpu-fill", "Primary GPU", gpu_val, "Device 0", SUCCESS)
-        tel_card("gear-fill", "Compute Backend", BACKEND or "None", f"Device: {DEVICE}", ACCENT)
-        tel_card("film", "FFmpeg Binary", Path(FFMPEG_PATH).name if FFMPEG_PATH else "Missing", "Audio Decoding Engine", WARNING)
-        tel_card("database-fill", "Model Local Storage", f"{get_dir_size(MODELS_DIR)/(1024**2):.1f} MB", "Local Cache Directory", ACCENT_CYAN)
+        tel_card(grid, "cpu-fill", "Primary GPU", gpu_val, "Device 0", SUCCESS)
+        tel_card(grid, "gear-fill", "Compute Backend", BACKEND or "None", f"Device: {DEVICE}", ACCENT)
+        tel_card(grid, "film", "FFmpeg Binary", Path(FFMPEG_PATH).name if FFMPEG_PATH else "Missing", "Audio Decoding Engine", WARNING)
+        tel_card(grid, "database-fill", "Model Local Storage", f"{get_dir_size(MODELS_DIR)/(1024**2):.1f} MB", "Local Cache Directory", ACCENT_CYAN)
+
+        # Live-updating hardware row — these StringVars are already refreshed
+        # every second by _telemetry_loop(); previously they were only ever
+        # displayed in the bottom status bar footer, never on this page,
+        # which is why everything below the static cards above was blank.
+        ctk.CTkLabel(card, text="Live System Load", text_color=TEXT_MAIN,
+                     font=ctk.CTkFont(FONT_FAMILY, 14, "bold")).pack(anchor="w", padx=16, pady=(4, 6))
+        live_grid = ctk.CTkFrame(card, fg_color="transparent"); live_grid.pack(fill="x", padx=16, pady=(0, 16))
+        tel_card(live_grid, "cpu-fill", "CPU Usage", "", "Live", ACCENT_CYAN, textvariable=self.cpu_live_var)
+        tel_card(live_grid, "hdd-fill", "RAM Usage", "", "Live", SUCCESS, textvariable=self.ram_live_var)
+        tel_card(live_grid, "gpu-card", "GPU Load", "", "Live (estimated)", ACCENT, textvariable=self.gpu_live_var)
+        tel_card(live_grid, "device-hdd-fill", "Disk Usage", "", "Live", WARNING, textvariable=self.disk_live_var)
+        tel_card(live_grid, "thermometer-half", "Temperature", "", "Live (estimated)", ERROR_C, textvariable=self.temp_live_var)
 
     def _render_logs(self, parent):
         """Application event log viewer."""
