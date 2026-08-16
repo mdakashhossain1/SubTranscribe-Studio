@@ -24,8 +24,7 @@ jobs:
         run: |
           $ver = "${{ github.ref_name }}" -replace '^v', ''
           if ([string]::IsNullOrWhiteSpace($ver)) { $ver = "0.0.0-dev" }
-          Set-Content -Path VERSION -Value $ver -NoNewline
-          echo "APP_VERSION=$ver" >> $env:GITHUB_ENV
+          Set-Content -Path VERSION -Value $ver -NoNewline -Encoding ascii
 
       - name: Set up Python
         uses: actions/setup-python@v5

@@ -11,10 +11,10 @@ set PYTHON=%VENV%\Scripts\python.exe
 set PYINSTALLER=%VENV%\Scripts\pyinstaller.exe
 
 :: Version comes from the VERSION file (single source of truth — see
-:: subgen.py's _load_app_version() and installer.iss's MyAppVersion).
+:: subgen.py's _load_app_version() and installer.iss's MyAppVersion, which
+:: reads this same file directly).
 set VER=dev
 if exist "%~dp0VERSION" set /p VER=<"%~dp0VERSION"
-set APP_VERSION=%VER%
 
 :: Install PyInstaller if missing
 if not exist "%PYINSTALLER%" (

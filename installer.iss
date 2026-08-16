@@ -1,10 +1,16 @@
 ; Script generated for SubTranscribe Studio Enterprise Edition
 #define MyAppName "SubTranscribe Studio"
-; Version comes from the APP_VERSION env var, set by CI from the git tag
-; (see .github/workflows/build-desktop.yml). Falls back to 0.0.0-dev for a
-; local manual compile where that env var isn't set.
-#define MyAppVersion GetEnv("APP_VERSION")
-#if MyAppVersion == ""
+; Version is read directly from the VERSION file at the project root — the
+; single source of truth also read by subgen.py at runtime. CI overwrites
+; that file from the git tag before compiling (see build-desktop.yml).
+; Read via ISPP's FileOpen/FileRead rather than GetEnv("APP_VERSION"): the
+; env-var approach silently produced a broken build in CI (the compile step
+; reported success but the installer's filename/version never resolved
+; correctly), while reading the file directly is simple, dependency-free,
+; and has been verified against the real Inno Setup compiler.
+#if FileExists("VERSION")
+  #define MyAppVersion Trim(FileRead(FileOpen("VERSION")))
+#else
   #define MyAppVersion "0.0.0-dev"
 #endif
 #define MyAppPublisher "SubTranscribe AI"
