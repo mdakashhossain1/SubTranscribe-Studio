@@ -51,16 +51,17 @@ if sys.stderr is None:
 
 
 # ── Graceful import of backends
+# Only probe availability here — importlib.util.find_spec() doesn't execute
+# the module, whereas `import faster_whisper` transitively pulls in
+# ctranslate2/transformers/torch (~2s). That cost is deferred into
+# transcribe() below and only paid the first time this backend actually runs
+# a transcription (never, when the whisper.cpp/Vulkan GPU path is used).
+import importlib.util
 BACKEND = None
-try:
-    from faster_whisper import WhisperModel
+if importlib.util.find_spec("faster_whisper") is not None:
     BACKEND = "faster_whisper"
-except ImportError:
-    try:
-        import whisper as openai_whisper
-        BACKEND = "openai_whisper"
-    except ImportError:
-        BACKEND = None
+elif importlib.util.find_spec("whisper") is not None:
+    BACKEND = "openai_whisper"
 
 try:
     import psutil
@@ -462,13 +463,47 @@ def find_ffmpeg():
 FFMPEG_PATH = find_ffmpeg()
 
 # ── GPU auto-detection (AMD / NVIDIA / CPU fallback)
+def _registry_gpu_names():
+    """Enumerate display adapter names via the Windows Registry — near-instant
+    (<1ms) and 100% reliable on Windows 10/11. Checked first by both
+    detect_device() and get_gpu_name() so neither pays for a slow torch/
+    ctranslate2 import just to answer "is there an NVIDIA GPU here?"."""
+    names = []
+    if os.name != "nt":
+        return names
+    try:
+        import winreg
+        key_path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as base_key:
+            for i in range(20):
+                try:
+                    with winreg.OpenKey(base_key, f"{i:04d}") as sub_key:
+                        name, _ = winreg.QueryValueEx(sub_key, "DriverDesc")
+                        if name and not any(x in name for x in ("Basic Display", "Virtual", "Remote", "Software")):
+                            names.append(name)
+                except OSError:
+                    continue
+    except Exception:
+        pass
+    return names
+
+_REGISTRY_GPU_NAMES = _registry_gpu_names()
+
 def detect_device():
     """
-    Probe for a CUDA-capable GPU (NVIDIA or AMD ROCm).
+    Probe for a CUDA-capable GPU (NVIDIA only — CTranslate2 requires it).
     Returns (device, compute_type) for faster-whisper.
     - GPU found  → ('cuda', 'float16')  — full precision, maximum speed
     - No GPU     → ('cpu',  'int8')     — quantised, still fast on CPU
+
+    Skips the `ctranslate2` import (10+ seconds on some machines) entirely
+    when the registry shows no NVIDIA adapter, since CTranslate2 can only
+    ever use NVIDIA CUDA. Previously this import ran unconditionally on
+    every launch — including on AMD/Intel-only machines — and was the
+    single biggest contributor to the multi-second startup freeze.
     """
+    if not any("nvidia" in n.lower() for n in _REGISTRY_GPU_NAMES):
+        return "cpu", "int8"
     try:
         import ctranslate2
         if ctranslate2.get_cuda_device_count() > 0:
@@ -482,29 +517,18 @@ DEVICE, COMPUTE_TYPE = detect_device()
 # ── Automated Multi-Stage GPU Detection (Windows Registry, PyTorch, PowerShell, nvidia-smi, WMIC)
 def get_gpu_name() -> str:
     """Automatically detect primary GPU name (NVIDIA, AMD, Intel). Zero manual config required."""
-    # 1. PyTorch / CUDA detection
+    # 1. Native Windows Registry (Instant, 100% reliable on all Windows 10/11 PCs)
+    # — tried first so the slow torch import below is skipped on the common path.
+    if _REGISTRY_GPU_NAMES:
+        return _REGISTRY_GPU_NAMES[0]
+
+    # 2. PyTorch / CUDA detection
     try:
         import torch
         if torch.cuda.is_available():
             name = torch.cuda.get_device_name(0)
             if name:
                 return name
-    except Exception:
-        pass
-
-    # 2. Native Windows Registry (Instant, 100% reliable on all Windows 10/11 PCs)
-    try:
-        import winreg
-        key_path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as base_key:
-            for i in range(20):
-                try:
-                    with winreg.OpenKey(base_key, f"{i:04d}") as sub_key:
-                        name, _ = winreg.QueryValueEx(sub_key, "DriverDesc")
-                        if name and not any(x in name for x in ("Basic Display", "Virtual", "Remote", "Software")):
-                            return name
-                except OSError:
-                    continue
     except Exception:
         pass
 
@@ -823,9 +847,12 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
     total_duration = 0.0
     detected_lang = lang if lang != "auto" else "unknown"
     result = []
+    decode_error = None
 
     for line in proc.stdout:
         line = line.rstrip("\n")
+        if line.lstrip().startswith("error:"):
+            decode_error = line.strip()
         if total_duration == 0.0:
             m = _WHISPERCPP_DURATION_RE.search(line)
             if m:
@@ -859,6 +886,9 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
     if returncode != 0:
         on_error(f"whisper.cpp exited with code {returncode}")
         return
+    if not result and decode_error:
+        on_error(f"whisper.cpp could not process this audio file: {decode_error}")
+        return
     on_done(result, detected_lang)
 
 # ── Transcription (NoneType Safe)
@@ -867,6 +897,7 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
         if USE_WHISPERCPP:
             transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error)
         elif BACKEND == "faster_whisper":
+            from faster_whisper import WhisperModel
             model = WhisperModel(
                 model_size,
                 device=DEVICE,                   # ← auto: 'cuda' (GPU) or 'cpu'
@@ -894,6 +925,7 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 on_segment(s, det, pct, seg_end, total_duration, speed, eta)
             on_done(result, det)
         elif BACKEND == "openai_whisper":
+            import whisper as openai_whisper
             model = openai_whisper.load_model(
                 model_size,
                 download_root=str(MODELS_DIR),   # ← always saves to project/models/
@@ -3142,18 +3174,31 @@ shortcut.Save
     def _pipeline(self, inp):
         try:
             audio_exts = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"}
-            if Path(inp).suffix.lower() not in audio_exts:
-                if not FFMPEG_PATH:
-                    self.root.after(0, self._err, "FFmpeg not found. Provide a .wav/.mp3 file directly.")
-                    return
+            suffix = Path(inp).suffix.lower()
+            if suffix == ".wav":
+                # Already clean PCM — no re-encode needed.
+                audio = inp
+            elif FFMPEG_PATH:
+                # Always normalize to 16kHz mono PCM WAV via FFmpeg first, for
+                # every input format (not just video). whisper.cpp's built-in
+                # decoder (miniaudio) is unreliable on compressed containers —
+                # some M4A/AAC files (long call recordings especially) fail to
+                # decode entirely while whisper.cpp still exits with code 0,
+                # which silently produced an empty transcript/SRT. FFmpeg
+                # decodes every container correctly.
                 self.root.after(0, self._setstatus, "Extracting audio with FFmpeg…")
                 self.tmp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
                 if not extract_audio(inp, self.tmp_wav, FFMPEG_PATH):
                     self.root.after(0, self._err, "FFmpeg failed to extract audio.")
                     return
                 audio = self.tmp_wav
-            else:
+            elif suffix in audio_exts:
+                # No FFmpeg available — best-effort: hand the raw file to the
+                # transcription backend directly.
                 audio = inp
+            else:
+                self.root.after(0, self._err, "FFmpeg not found. Provide a .wav/.mp3 file directly.")
+                return
 
             model_size = self.model_var.get()
             sl = WHISPER_LANG_MAP.get(self.src_lang_var.get())
