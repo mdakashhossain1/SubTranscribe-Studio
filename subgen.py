@@ -1021,6 +1021,7 @@ class WaveformBar(tk.Canvas):
         self.played_color = played_color
         self.unplayed_color = unplayed_color
         self.on_seek = None   # callback(fraction: float) fired on click/drag
+        self._last_drawn_progress = None  # playhead pixel-position cache — see set()
         self.bind("<Configure>", lambda e: self._redraw())
         self.bind("<Button-1>", self._on_click)
         self.bind("<B1-Motion>", self._on_click)
@@ -1029,20 +1030,40 @@ class WaveformBar(tk.Canvas):
         """Replace the waveform with newly extracted amplitude data (or [] to
         show the idle placeholder while a file is still being analyzed)."""
         self.peaks = peaks or []
+        self._last_drawn_progress = None
         self._redraw()
 
     def set(self, pct):
         """Advance the playhead / processed-portion marker (0.0 - 1.0)."""
-        self.progress = max(0.0, min(float(pct), 1.0))
+        new_progress = max(0.0, min(float(pct), 1.0))
         vs, ve = self._view_range()
-        if not (vs <= self.progress <= ve):
-            self.view_center = self.progress
+        view_shifted = not (vs <= new_progress <= ve)
+        if view_shifted:
+            self.view_center = new_progress
+        self.progress = new_progress
+
+        # This is called every ~80ms during playback and once per segment
+        # during transcription — up to several times a second. _redraw()
+        # clears and rebuilds the entire canvas (up to ~1500 peak bars), so
+        # without this check it was doing a full rebuild far more often than
+        # the rendered pixels actually changed, which was a real source of
+        # UI stutter. Skip the rebuild when the playhead hasn't moved by at
+        # least a pixel and the visible window hasn't shifted.
+        w = self.winfo_width()
+        if not view_shifted and self._last_drawn_progress is not None and w > 1:
+            vs2, ve2 = self._view_range()
+            if ve2 > vs2:
+                last_x = ((self._last_drawn_progress - vs2) / (ve2 - vs2)) * w
+                new_x = ((new_progress - vs2) / (ve2 - vs2)) * w
+                if abs(new_x - last_x) < 1.0:
+                    return
         self._redraw()
 
     def set_zoom(self, zoom):
         """Zoom the visible window in/out (1.0 = full file, higher = closer)."""
         self.zoom = max(1.0, min(float(zoom), self.MAX_ZOOM))
         self.view_center = self.progress
+        self._last_drawn_progress = None
         self._redraw()
 
     def _view_range(self):
@@ -1067,6 +1088,7 @@ class WaveformBar(tk.Canvas):
 
     def _redraw(self):
         self.delete("all")
+        self._last_drawn_progress = self.progress
         w = self.winfo_width()
         h = self.winfo_height()
         if w <= 1 or h <= 1:
@@ -1159,6 +1181,8 @@ class SubGenApp:
         self.audio_player = AudioPlayer()
         self._waveform_cache = {}
         self._transcript_row_widgets = []
+        self._pending_rows = []
+        self._row_flush_scheduled = False
         self._current_highlight_idx = None
         self._transcript_fullscreen = False
         self.loop_segment = False
@@ -1177,7 +1201,7 @@ class SubGenApp:
         self._build()
         # Set icon AFTER build — CTk overrides it during its own init
         self.root.after(100, self._set_icon)
-        self.root.after(200, self._update_live_telemetry)
+        self.root.after(200, self._start_live_telemetry)
         self.root.mainloop()
 
     def _set_icon(self):
@@ -2660,9 +2684,17 @@ shortcut.Save
             w.bind("<Button-1>", lambda e: webbrowser.open(self._update_url))
             w.configure(cursor="hand2")
 
-    def _update_live_telemetry(self):
-        """Fetch exact real-time CPU, RAM, Disk, Temp, and GPU metrics asynchronously on a background thread."""
-        def fetch_metrics():
+    def _start_live_telemetry(self):
+        """Start the CPU/RAM/Disk/GPU telemetry poller as a single persistent
+        background thread. Previously a brand-new thread was spawned every
+        second for the app's entire lifetime (via a self-rescheduling
+        root.after loop) even while completely idle — pure OS thread-creation
+        churn that contributed to idle-state jank. One long-lived thread with
+        an internal sleep loop does the same job without the overhead."""
+        threading.Thread(target=self._telemetry_loop, daemon=True).start()
+
+    def _telemetry_loop(self):
+        while True:
             try:
                 # 1. CPU Usage %
                 cpu_val = psutil.cpu_percent(interval=None) if HAS_PSUTIL else 15.0
@@ -2714,9 +2746,7 @@ shortcut.Save
                 self.root.after(0, apply_ui)
             except Exception:
                 pass
-
-        threading.Thread(target=fetch_metrics, daemon=True).start()
-        self.root.after(1000, self._update_live_telemetry)
+            time.sleep(1)
 
     def _copy_transcript(self):
         lines = []
@@ -2802,11 +2832,30 @@ shortcut.Save
 
     # ── Transcript rows (editable, clickable, playback-synced)
     def _add_transcript_row(self, seg, idx):
+        """Buffer the row instead of building it immediately. This fires once
+        per transcribed segment — up to several times a second on long files
+        — and each row is 6 new widgets plus a scrollable-canvas geometry
+        recompute, which was a major source of UI stutter when done one at a
+        time. Buffering a short burst and building all pending rows in a
+        single pass cuts the number of geometry recomputes dramatically."""
         if not hasattr(self, "transcript_rows_frame") or not self.transcript_rows_frame:
+            return
+        self._pending_rows.append((seg, idx))
+        if not self._row_flush_scheduled:
+            self._row_flush_scheduled = True
+            self.root.after(120, self._flush_transcript_rows)
+
+    def _flush_transcript_rows(self):
+        self._row_flush_scheduled = False
+        pending, self._pending_rows = self._pending_rows, []
+        if not pending:
             return
         if hasattr(self, "_transcript_empty_lbl") and self._transcript_empty_lbl:
             self._transcript_empty_lbl.pack_forget()
+        for seg, idx in pending:
+            self._build_transcript_row(seg, idx)
 
+    def _build_transcript_row(self, seg, idx):
         s_start = float(seg.get('start', 0.0) or 0.0) if isinstance(seg, dict) else 0.0
         s_end   = float(seg.get('end', 0.0) or 0.0) if isinstance(seg, dict) else 0.0
         s_text  = str(seg.get('text', '') or '').strip() if isinstance(seg, dict) else ''
@@ -2909,6 +2958,7 @@ shortcut.Save
 
     def _clear(self):
         self._transcript_row_widgets = []
+        self._pending_rows = []
         self._current_highlight_idx = None
         if hasattr(self, "transcript_rows_frame") and self.transcript_rows_frame:
             for w in self.transcript_rows_frame.winfo_children():
@@ -3296,54 +3346,55 @@ shortcut.Save
                 self.all_segs.append(seg)
                 row_idx = len(self.all_segs) - 1
 
-                time_txt = f"{_fmt_time_short(cur_end)} / {_fmt_time_short(total_dur)}"
-                if hasattr(self, "audio_time_lbl") and self.audio_time_lbl:
-                    self.root.after(0, lambda t=time_txt: self.audio_time_lbl.configure(text=t))
-                if hasattr(self, "audio_scrub_bar") and self.audio_scrub_bar:
-                    self.root.after(0, lambda p=pct: self.audio_scrub_bar.set(max(0.0, min(p, 1.0))))
-                self.root.after(0, lambda s=seg, i=row_idx: self._add_transcript_row(s, i))
-
                 pct_val = float(pct) if pct is not None else 0.0
                 cur_val = float(cur_end) if cur_end is not None else 0.0
                 tot_val = float(total_dur) if total_dur is not None else 0.0
                 spd_val = float(speed) if speed is not None else 0.0
                 eta_val = float(eta) if eta is not None else 0.0
 
-                # Update telemetry stat cards
-                seg_num = len(self.all_segs)
-                self.root.after(0, self.seg_count.set, seg_num)
-                self.root.after(0, self.speed_var.set, f"{spd_val:.1f}x")
-                self.root.after(0, self.processed_var.set, _fmt_time_short(cur_val))
-                rem = max(0, tot_val - cur_val)
-                self.root.after(0, self.remaining_var.set, _fmt_time_short(rem))
-
                 # RTF = Real Time Factor (elapsed wall time / audio processed)
                 elapsed = time.time() - self._start_time if self._start_time else 0.001
                 rtf = elapsed / max(cur_val, 0.001)
-                self.root.after(0, self.rtf_var.set, f"{rtf:.2f}")
 
-                # ETA for bottom bar
                 eta_h = int(eta_val // 3600)
                 eta_m = int((eta_val % 3600) // 60)
                 eta_s = int(eta_val % 60)
-                self.root.after(0, self.eta_var.set, f"{eta_h:02d}:{eta_m:02d}:{eta_s:02d}")
 
                 pct_str = f"{int(pct_val * 100)}%"
                 cur_str = _fmt_time_short(cur_val)
                 tot_str = _fmt_time_short(tot_val)
                 speed_str = f"{spd_val:.1f}x"
                 eta_str = _fmt_time_short(eta_val)
-
-                # Update big Overall Progress 26pt percentage label!
-                if hasattr(self, "pct_lbl") and self.pct_lbl:
-                    self.root.after(0, lambda p=pct_str: self.pct_lbl.configure(text=p))
+                rem = max(0, tot_val - cur_val)
+                seg_num = len(self.all_segs)
 
                 lang_str = f"Detected: {lang}"
                 if translate_fn:
                     lang_str += f"  →  {tgt_name}"
                 status_msg = f"Transcribing… {pct_str} ({cur_str}/{tot_str})  |  {speed_str}  |  ETA: {eta_str}  |  {lang_str}"
-                self.root.after(0, self._setstatus, status_msg)
-                self.root.after(0, self.progress_var.set, max(0.02, min(pct_val, 0.99)))
+
+                # Single UI-thread hop per segment instead of a dozen separate
+                # root.after() calls — each is its own Tk event-queue entry, and
+                # on long files emitting several segments/sec that was flooding
+                # the queue and starving redraws, causing visible UI stutter.
+                def _apply_ui():
+                    if hasattr(self, "audio_time_lbl") and self.audio_time_lbl:
+                        self.audio_time_lbl.configure(text=f"{cur_str} / {tot_str}")
+                    if hasattr(self, "audio_scrub_bar") and self.audio_scrub_bar:
+                        self.audio_scrub_bar.set(max(0.0, min(pct_val, 1.0)))
+                    self._add_transcript_row(seg, row_idx)
+                    self.seg_count.set(seg_num)
+                    self.speed_var.set(speed_str)
+                    self.processed_var.set(cur_str)
+                    self.remaining_var.set(_fmt_time_short(rem))
+                    self.rtf_var.set(f"{rtf:.2f}")
+                    self.eta_var.set(f"{eta_h:02d}:{eta_m:02d}:{eta_s:02d}")
+                    if hasattr(self, "pct_lbl") and self.pct_lbl:
+                        self.pct_lbl.configure(text=pct_str)
+                    self._setstatus(status_msg)
+                    self.progress_var.set(max(0.02, min(pct_val, 0.99)))
+
+                self.root.after(0, _apply_ui)
 
             def on_done(segs, lang):
                 self.root.after(0, self._post, segs, lang, inp)
