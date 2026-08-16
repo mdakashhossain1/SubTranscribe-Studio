@@ -3182,15 +3182,24 @@ shortcut.Save
                 total_downloaded = get_progress()
                 session_downloaded = max(0, total_downloaded - base_size)
 
-                pct = min(total_downloaded / expected_bytes, 0.99) if expected_bytes > 0 else 0.0
+                # expected_bytes is only ever an estimate (HF Hub API metadata
+                # can under-report LFS file sizes, and the static size table is
+                # a rough approximation) — if what's actually landed on disk
+                # already exceeds it, trust reality over the estimate. Without
+                # this, the displayed total looked smaller than the amount
+                # already downloaded, percentage got stuck at 99% while data
+                # kept flowing in, and ETA showed a false "0s".
+                effective_total = max(expected_bytes, total_downloaded)
+
+                pct = min(total_downloaded / effective_total, 0.99) if effective_total > 0 else 0.0
                 elapsed = max(0.1, time.time() - t0)
                 speed = session_downloaded / elapsed
                 speed_mb = speed / (1024 * 1024)
-                rem_bytes = max(0, expected_bytes - total_downloaded)
+                rem_bytes = max(0, effective_total - total_downloaded)
                 eta = (rem_bytes / speed) if speed > 1024 else None
 
                 pct_str = f"{int(pct * 100)}%"
-                dl_str = f"{_fmt_size(total_downloaded)} / {_fmt_size(expected_bytes)}"
+                dl_str = f"{_fmt_size(total_downloaded)} / {_fmt_size(effective_total)}"
                 speed_str = f"{speed_mb:.1f} MB/s"
                 elapsed_str = _fmt_time_short(elapsed)
                 eta_str = _fmt_time_short(eta) if eta is not None else "calculating…"
