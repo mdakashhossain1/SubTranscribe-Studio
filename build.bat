@@ -1,7 +1,7 @@
 @echo off
-title SubGen - Building Windows Executable & Installer
+title SubTranscribe Studio - Building Windows Executable & Installer
 echo ============================================
-echo  SubGen - Building Windows Executable & Setup
+echo  SubTranscribe Studio - Building Windows Executable & Setup
 echo ============================================
 echo.
 
@@ -35,11 +35,11 @@ if exist "%~dp0build" (
 )
 
 echo.
-echo Building SubGen.exe with logo icon...
+echo Building SubTranscribeStudio.exe with logo icon...
 echo.
 
 "%PYINSTALLER%" ^
-    --name "SubGen" ^
+    --name "SubTranscribeStudio" ^
     --windowed ^
     --onedir ^
     --icon "%~dp0assets\logo.ico" ^
@@ -69,29 +69,29 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Copy required runtime directories to dist\SubGen
+:: Copy required runtime directories to dist\SubTranscribeStudio
 :: (models are NOT bundled here - they're downloaded on demand into the
 :: per-user AppData folder at runtime, since Program Files isn't writable
 :: by standard users - see DATA_DIR in subgen.py)
 echo Copying assets and binaries...
-xcopy /E /I /Y "%~dp0assets" "%~dp0dist\SubGen\assets" >nul 2>&1
-if exist "%~dp0bin" xcopy /E /I /Y "%~dp0bin" "%~dp0dist\SubGen\bin" >nul 2>&1
-if exist "%~dp0whisper.cpp" xcopy /E /I /Y "%~dp0whisper.cpp" "%~dp0dist\SubGen\whisper.cpp" >nul 2>&1
-copy /Y "%~dp0VERSION" "%~dp0dist\SubGen\VERSION" >nul 2>&1
+xcopy /E /I /Y "%~dp0assets" "%~dp0dist\SubTranscribeStudio\assets" >nul 2>&1
+if exist "%~dp0bin" xcopy /E /I /Y "%~dp0bin" "%~dp0dist\SubTranscribeStudio\bin" >nul 2>&1
+if exist "%~dp0whisper.cpp" xcopy /E /I /Y "%~dp0whisper.cpp" "%~dp0dist\SubTranscribeStudio\whisper.cpp" >nul 2>&1
+copy /Y "%~dp0VERSION" "%~dp0dist\SubTranscribeStudio\VERSION" >nul 2>&1
 
-:: Create Desktop Shortcut helper VBScript in dist\SubGen
+:: Create Desktop Shortcut helper VBScript in dist\SubTranscribeStudio
 (
 echo Set WshShell = CreateObject^("WScript.Shell"^^)^
 echo desktop = WshShell.SpecialFolders^("Desktop"^)^
 echo Set shortcut = WshShell.CreateShortcut^(desktop ^& "\SubTranscribe Studio.lnk"^)^
-echo shortcut.TargetPath = "%~dp0dist\SubGen\SubGen.exe"^
-echo shortcut.WorkingDirectory = "%~dp0dist\SubGen"^
-echo shortcut.IconLocation = "%~dp0dist\SubGen\assets\logo.ico"^
+echo shortcut.TargetPath = "%~dp0dist\SubTranscribeStudio\SubTranscribeStudio.exe"^
+echo shortcut.WorkingDirectory = "%~dp0dist\SubTranscribeStudio"^
+echo shortcut.IconLocation = "%~dp0dist\SubTranscribeStudio\assets\logo.ico"^
 echo shortcut.Description = "SubTranscribe Studio Enterprise Edition"^
 echo shortcut.Save
-) > "%~dp0dist\SubGen\Create_Desktop_Shortcut.vbs"
+) > "%~dp0dist\SubTranscribeStudio\Create_Desktop_Shortcut.vbs"
 
-:: Create Uninstaller & Complete Cleanup helper script in dist\SubGen
+:: Create Uninstaller & Complete Cleanup helper script in dist\SubTranscribeStudio
 (
 echo @echo off
 echo title SubTranscribe Studio - Uninstaller
@@ -112,7 +112,7 @@ echo :End
 echo.
 echo Uninstall complete.
 echo pause
-) > "%~dp0dist\SubGen\Uninstall_SubTranscribe.bat"
+) > "%~dp0dist\SubTranscribeStudio\Uninstall_SubTranscribe.bat"
 
 :: Attempt Inno Setup compilation if ISCC.exe is available
 set ISCC="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
@@ -129,13 +129,13 @@ echo ============================================
 echo  BUILD COMPLETE!
 echo.
 echo  1. Standalone Executable Folder:
-echo     dist\SubGen\SubGen.exe
+echo     dist\SubTranscribeStudio\SubTranscribeStudio.exe
 echo
 echo  2. Desktop Shortcut Creator:
-echo     dist\SubGen\Create_Desktop_Shortcut.vbs
+echo     dist\SubTranscribeStudio\Create_Desktop_Shortcut.vbs
 echo
 echo  3. Complete Uninstall & Model Cleanup Script:
-echo     dist\SubGen\Uninstall_SubTranscribe.bat
+echo     dist\SubTranscribeStudio\Uninstall_SubTranscribe.bat
 if exist %ISCC% (
 echo  4. Windows Setup Installer (With Desktop Icon Checkbox & Full Cleanup Prompt):
 echo     dist\SubTranscribe_Studio_Setup_v%VER%.exe

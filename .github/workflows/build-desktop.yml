@@ -45,7 +45,7 @@ jobs:
       - name: Build with PyInstaller
         run: >
           pyinstaller
-          --name "SubGen"
+          --name "SubTranscribeStudio"
           --windowed
           --onedir
           --icon "assets/logo.ico"
@@ -69,13 +69,13 @@ jobs:
       - name: Bundle runtime assets
         shell: pwsh
         run: |
-          Copy-Item -Recurse -Force assets dist/SubGen/assets
-          if (Test-Path bin) { Copy-Item -Recurse -Force bin dist/SubGen/bin }
-          Copy-Item -Force VERSION dist/SubGen/VERSION
+          Copy-Item -Recurse -Force assets dist/SubTranscribeStudio/assets
+          if (Test-Path bin) { Copy-Item -Recurse -Force bin dist/SubTranscribeStudio/bin }
+          Copy-Item -Force VERSION dist/SubTranscribeStudio/VERSION
 
       - name: Zip portable build
         shell: pwsh
-        run: Compress-Archive -Path dist/SubGen/* -DestinationPath SubTranscribe-Studio-Windows-Portable.zip
+        run: Compress-Archive -Path dist/SubTranscribeStudio/* -DestinationPath SubTranscribe-Studio-Windows-Portable.zip
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
@@ -127,7 +127,7 @@ jobs:
       - name: Build Linux Binary with PyInstaller
         run: |
           pyinstaller \
-            --name "SubGen" \
+            --name "SubTranscribeStudio" \
             --onedir \
             --collect-all customtkinter \
             --collect-all faster_whisper \
@@ -144,10 +144,10 @@ jobs:
 
       - name: Bundle Linux runtime assets & Compress
         run: |
-          cp -r assets dist/SubGen/assets
-          if [ -d "bin" ]; then cp -r bin dist/SubGen/bin; fi
-          cp VERSION dist/SubGen/VERSION
-          tar -czvf SubTranscribe-Studio-Linux-x86_64.tar.gz -C dist/SubGen .
+          cp -r assets dist/SubTranscribeStudio/assets
+          if [ -d "bin" ]; then cp -r bin dist/SubTranscribeStudio/bin; fi
+          cp VERSION dist/SubTranscribeStudio/VERSION
+          tar -czvf SubTranscribe-Studio-Linux-x86_64.tar.gz -C dist/SubTranscribeStudio .
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -247,7 +247,7 @@ jobs:
       - name: Build ARM64 Binary with PyInstaller
         run: |
           pyinstaller \
-            --name "SubGen" \
+            --name "SubTranscribeStudio" \
             --onedir \
             --collect-all customtkinter \
             --collect-all faster_whisper \
@@ -264,10 +264,10 @@ jobs:
 
       - name: Bundle Raspberry Pi runtime assets & Compress
         run: |
-          cp -r assets dist/SubGen/assets
-          if [ -d "bin" ]; then cp -r bin dist/SubGen/bin; fi
-          cp VERSION dist/SubGen/VERSION
-          tar -czvf SubTranscribe-Studio-RaspberryPi-arm64.tar.gz -C dist/SubGen .
+          cp -r assets dist/SubTranscribeStudio/assets
+          if [ -d "bin" ]; then cp -r bin dist/SubTranscribeStudio/bin; fi
+          cp VERSION dist/SubTranscribeStudio/VERSION
+          tar -czvf SubTranscribe-Studio-RaspberryPi-arm64.tar.gz -C dist/SubTranscribeStudio .
 
       - name: Upload Raspberry Pi Artifacts
         uses: actions/upload-artifact@v4
@@ -345,13 +345,13 @@ jobs:
 
             #### 🪟 Windows (10/11)
             - **`SubTranscribe_Studio_Setup_${{ github.ref_name }}.exe`** — Windows Installer *(Recommended: Start Menu shortcut & clean uninstaller)*
-            - **`SubTranscribe-Studio-Windows-Portable.zip`** — Windows Portable Bundle *(Unzip and run `SubGen.exe`)*
+            - **`SubTranscribe-Studio-Windows-Portable.zip`** — Windows Portable Bundle *(Unzip and run `SubTranscribeStudio.exe`)*
 
             #### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
-            - **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux Binary Bundle *(Extract and run `./SubGen`)*
+            - **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux Binary Bundle *(Extract and run `./SubTranscribeStudio`)*
 
             #### 🍓 Raspberry Pi OS & ARM64 Linux (Raspberry Pi 4 / 5)
-            - **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** — ARM64 Linux Bundle *(Extract and run `./SubGen`)*
+            - **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** — ARM64 Linux Bundle *(Extract and run `./SubTranscribeStudio`)*
 
             #### 🍎 macOS (MacBook / Mac Intel & Apple Silicon M1/M2/M3/M4)
             - **`SubTranscribe-Studio-macOS-universal.zip`** — macOS Desktop Bundle *(Unzip and open `SubTranscribeStudio`)*

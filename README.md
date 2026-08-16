@@ -28,14 +28,14 @@
 Grab prebuilt applications for **Windows**, **Linux**, **macOS**, **Raspberry Pi**, and **Docker** from the **[Releases page](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest)** — no Python install required:
 
 ### 🪟 Windows (10/11)
-- **`SubTranscribe_Studio_Setup_v1.0.0.exe`** — Installer (Start Menu shortcut & clean uninstaller)
-- **`SubTranscribe-Studio-Windows-Portable.zip`** — Portable bundle (Unzip and run `SubGen.exe`)
+- **`SubTranscribe_Studio_Setup_vX.Y.Z.exe`** — Installer (Start Menu shortcut & clean uninstaller)
+- **`SubTranscribe-Studio-Windows-Portable.zip`** — Portable bundle (Unzip and run `SubTranscribeStudio.exe`)
 
 ### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
-- **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux standalone binary bundle (`./SubGen`)
+- **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** — Linux standalone binary bundle (`./SubTranscribeStudio`)
 
 ### 🍓 Raspberry Pi OS (Raspberry Pi 4 / 5 - ARM64 Linux)
-- **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** — ARM64 Linux standalone bundle (`./SubGen`)
+- **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** — ARM64 Linux standalone bundle (`./SubTranscribeStudio`)
 
 ### 🍎 macOS (MacBook / Mac Intel & Apple Silicon M1/M2/M3/M4)
 - **`SubTranscribe-Studio-macOS-universal.zip`** — macOS desktop app bundle
@@ -71,8 +71,8 @@ It can:
 ## 🚀 Platform-Specific Setup & Installation Guide
 
 ### 🪟 Windows (10/11)
-1. Download **`SubTranscribe_Studio_Setup_v1.0.0.exe`** or **`SubTranscribe-Studio-Windows-Portable.zip`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
-2. Double-click the `.exe` installer to install, or unzip the `.zip` and double-click **`SubGen.exe`**.
+1. Download **`SubTranscribe_Studio_Setup_vX.Y.Z.exe`** or **`SubTranscribe-Studio-Windows-Portable.zip`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
+2. Double-click the `.exe` installer to install, or unzip the `.zip` and double-click **`SubTranscribeStudio.exe`**.
 3. *(Optional)* If Windows SmartScreen warning appears on first launch, click **More info → Run anyway**.
 
 ---
@@ -86,7 +86,7 @@ It can:
 3. Extract and launch:
    ```bash
    tar -xzvf SubTranscribe-Studio-Linux-x86_64.tar.gz
-   ./SubGen
+   ./SubTranscribeStudio
    ```
 
 ---
@@ -100,7 +100,7 @@ It can:
 3. Extract and launch:
    ```bash
    tar -xzvf SubTranscribe-Studio-RaspberryPi-arm64.tar.gz
-   ./SubGen
+   ./SubTranscribeStudio
    ```
 
 ---

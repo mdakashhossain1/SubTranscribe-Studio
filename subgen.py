@@ -1,5 +1,5 @@
 """
-SubGen — AI Subtitle Generator
+SubTranscribe Studio — AI Subtitle Generator
 Transcribes audio/video → SRT / VTT / ASS / TXT
 Auto-detects language, translates to any target language.
 Uses faster-whisper (preferred) or openai-whisper as fallback.
@@ -29,7 +29,7 @@ from tkinter import filedialog, messagebox
 # __file__ points inside the internal bundle, not the real exe folder where
 # assets actually get copied, so this must be frozen-aware from the start.
 if getattr(sys, "frozen", False):
-    # Running inside a compiled .exe — use the folder where SubGen.exe lives
+    # Running inside a compiled .exe — use the folder where SubTranscribeStudio.exe lives
     # for bundled (read-only) resources...
     PROJECT_DIR = Path(sys.executable).parent.resolve()
     # ...but installed builds commonly live under Program Files, which a
@@ -1106,7 +1106,7 @@ class SubGenApp:
         try:
             import ctypes
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                "SubTranscribe.SubGen.1.0"
+                "SubTranscribe.Studio.1.0"
             )
         except Exception:
             pass
