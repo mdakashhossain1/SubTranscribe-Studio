@@ -72,7 +72,7 @@ begin
   if not DirExists(ModelsDir) and not FileExists(HistFile) then
     Exit;
 
-  Form := CreateCustomForm();
+  Form := TSetupForm.Create(nil);
   try
     Form.ClientWidth := ScaleX(420);
     Form.ClientHeight := ScaleY(210);
@@ -125,7 +125,6 @@ begin
     BtnCancel.Top := Form.ClientHeight - ScaleY(32);
     BtnCancel.Caption := 'Cancel';
     BtnCancel.ModalResult := mrCancel;
-    Form.CancelButton := BtnCancel;
 
     if Form.ShowModal() = mrOk then
     begin
