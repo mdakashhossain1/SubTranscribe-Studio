@@ -727,6 +727,96 @@ def write_txt(segs, path):
 
 WRITERS = {"SRT": write_srt, "VTT": write_vtt, "ASS": write_ass, "TXT": write_txt}
 
+
+def resegment_by_sentence(segs, max_words=10):
+    """Re-segment Whisper output so every subtitle block is a readable phrase
+    rather than an arbitrary chunk boundary.
+
+    Priority order for splitting:
+      1. Sentence-ending punctuation  (. ? !)  -- always splits here.
+      2. Comma-separated clause       (,)       -- splits after a comma when
+         the current clause already has >= max_words//2 words.
+      3. Hard word-count cap          (max_words) -- forces a split even with
+         no punctuation so subtitles never exceed a comfortable reading length.
+
+    Algorithm
+    ---------
+    1. Build a flat per-word timeline by distributing each Whisper segment's
+       duration evenly across the words it contains.
+    2. Walk the word list applying the split rules above.
+    3. Flush any remaining words as the final subtitle block.
+
+    Returns a list of {'start', 'end', 'text'} dicts -- the same shape that
+    write_srt / write_vtt / etc. expect.  Falls back to the original list if
+    nothing could be parsed.
+    """
+    if not segs:
+        return segs
+
+    # -- Step 1: build a per-word timeline --
+    word_timeline = []  # [(start_sec, end_sec, word_str), ...]
+    for seg in segs:
+        text = (seg.get("text") or "").strip()
+        if not text:
+            continue
+        seg_start = float(seg.get("start") or 0.0)
+        seg_end   = float(seg.get("end")   or seg_start)
+        dur = max(seg_end - seg_start, 0.0)
+        words = text.split()
+        if not words:
+            continue
+        # Distribute duration evenly across words
+        w_dur = dur / len(words)
+        for j, w in enumerate(words):
+            ws = seg_start + j * w_dur
+            we = seg_start + (j + 1) * w_dur
+            word_timeline.append((ws, we, w))
+
+    if not word_timeline:
+        return segs
+
+    # -- Step 2: group words into subtitle blocks --
+    _SENT_END  = re.compile(r'[.?!]["\')\]]*$')   # terminal sentence punct
+    _COMMA_END = re.compile(r',$')                  # trailing comma
+
+    half_max = max(1, max_words // 2)
+
+    sentences = []
+    buf_words = []
+    buf_start = word_timeline[0][0]
+
+    def _flush(end_time):
+        if buf_words:
+            sentences.append({
+                "start": buf_start,
+                "end":   end_time,
+                "text":  " ".join(buf_words),
+            })
+            del buf_words[:]
+
+    for (ws, we, word) in word_timeline:
+        if not buf_words:
+            buf_start = ws
+        buf_words.append(word)
+
+        n = len(buf_words)
+
+        if _SENT_END.search(word):
+            # Rule 1 -- sentence-ending punctuation: always split
+            _flush(we)
+        elif _COMMA_END.search(word) and n >= half_max:
+            # Rule 2 -- comma after a decent clause length: split here
+            _flush(we)
+        elif n >= max_words:
+            # Rule 3 -- hard cap: force split regardless of punctuation
+            _flush(we)
+
+    # -- Step 3: flush any trailing words --
+    if buf_words:
+        _flush(word_timeline[-1][1])
+
+    return sentences if sentences else segs
+
 # ── Audio extraction
 def extract_audio(inp, outwav, ffmpeg):
     cmd = [ffmpeg, "-y", "-i", inp, "-vn", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", outwav]
@@ -3483,6 +3573,11 @@ shortcut.Save
         # Translation/transliteration already happened live, per segment, in on_seg —
         # self.all_segs holds the final (already-converted) text in arrival order.
         segs = self.all_segs
+
+        # Re-segment so every subtitle block ends at a sentence boundary
+        # (. ? !) rather than at a raw Whisper chunk boundary mid-sentence.
+        segs = resegment_by_sentence(segs)
+
         fmt = self.fmt_var.get()
         out_dir = self.output_dir.get().strip() or str(Path(inp).parent)
         out_path = os.path.join(out_dir, f"{Path(inp).stem}.{fmt.lower()}")
