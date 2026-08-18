@@ -329,30 +329,65 @@ MODEL_VRAM_MB = {
 
 def is_model_downloaded(model_size: str) -> bool:
     """Check if the selected backend's model weights are fully cached on disk."""
+    candidate_model_dirs = [
+        MODELS_DIR,
+        PROJECT_DIR / "models",
+        Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "SubTranscribe Studio" / "models"
+    ]
+    # Deduplicate candidate directories
+    seen = set()
+    unique_dirs = []
+    for d in candidate_model_dirs:
+        resolved = str(d.resolve()) if d.exists() else str(d)
+        if resolved not in seen:
+            seen.add(resolved)
+            unique_dirs.append(d)
+
     if USE_WHISPERCPP:
         filename = GGML_MODEL_FILES.get(model_size, (None, None))[1]
         if not filename:
             return False
-        f = GGML_MODELS_DIR / filename
         exp_mb = GGML_MODEL_SIZES_MB.get(model_size, 50)
-        min_bytes = int(exp_mb * 1024 * 1024 * 0.8)
-        return f.exists() and not f.is_symlink() and f.stat().st_size >= min_bytes
+        min_bytes = int(exp_mb * 1024 * 1024 * 0.7)
+        for base_dir in unique_dirs:
+            f = base_dir / "ggml" / filename
+            if f.exists() and not f.is_symlink():
+                try:
+                    if f.stat().st_size >= min_bytes:
+                        return True
+                except Exception:
+                    pass
+        return False
+
     repo = MODEL_REPOS.get(model_size, "")
     if not repo:
         return False
     # HuggingFace cache format: models--{org}--{name}
     cache_name = "models--" + repo.replace("/", "--")
-    snapshots  = MODELS_DIR / cache_name / "snapshots"
-    if not snapshots.exists():
-        return False
     exp_mb = MODEL_SIZES_MB.get(model_size, 50)
-    min_bytes = int(exp_mb * 1024 * 1024 * 0.8)
-    for snap in snapshots.iterdir():
-        if snap.is_dir():
-            for f in snap.iterdir():
-                if f.name in ("model.bin", "model.safetensors"):
+    min_bytes = int(exp_mb * 1024 * 1024 * 0.7)
+
+    for base_dir in unique_dirs:
+        repo_dir = base_dir / cache_name
+        if not repo_dir.exists():
+            continue
+        snapshots = repo_dir / "snapshots"
+        if snapshots.exists():
+            for snap in snapshots.iterdir():
+                if snap.is_dir():
+                    for f in snap.iterdir():
+                        if f.name in ("model.bin", "model.safetensors"):
+                            try:
+                                if f.stat().st_size >= min_bytes:
+                                    return True
+                            except Exception:
+                                pass
+        blobs = repo_dir / "blobs"
+        if blobs.exists():
+            for b in blobs.iterdir():
+                if b.is_file():
                     try:
-                        if f.stat().st_size >= min_bytes:
+                        if b.stat().st_size >= min_bytes:
                             return True
                     except Exception:
                         pass
@@ -3520,37 +3555,52 @@ shortcut.Save
         dl_active = [True]
 
         def poll_progress():
+            last_msg = ""
             while dl_active[0]:
-                time.sleep(0.25)
+                time.sleep(0.35)
+                if not dl_active[0]:
+                    break
                 total_downloaded = get_progress()
                 session_downloaded = max(0, total_downloaded - base_size)
 
-                # expected_bytes is only ever an estimate (HF Hub API metadata
-                # can under-report LFS file sizes, and the static size table is
-                # a rough approximation) — if what's actually landed on disk
-                # already exceeds it, trust reality over the estimate. Without
-                # this, the displayed total looked smaller than the amount
-                # already downloaded, percentage got stuck at 99% while data
-                # kept flowing in, and ETA showed a false "0s".
                 effective_total = max(expected_bytes, total_downloaded)
-
-                pct = min(total_downloaded / effective_total, 0.99) if effective_total > 0 else 0.0
                 elapsed = max(0.1, time.time() - t0)
                 speed = session_downloaded / elapsed
                 speed_mb = speed / (1024 * 1024)
                 rem_bytes = max(0, effective_total - total_downloaded)
                 eta = (rem_bytes / speed) if speed > 1024 else None
 
-                pct_str = f"{int(pct * 100)}%"
-                dl_str = f"{_fmt_size(total_downloaded)} / {_fmt_size(effective_total)}"
-                speed_str = f"{speed_mb:.1f} MB/s"
-                elapsed_str = _fmt_time_short(elapsed)
-                eta_str = _fmt_time_short(eta) if eta is not None else "calculating…"
+                if effective_total > 0 and total_downloaded >= effective_total * 0.999:
+                    pct = 1.0
+                    pct_str = "100%"
+                    dl_str = f"{_fmt_size(total_downloaded)} / {_fmt_size(effective_total)}"
+                    speed_str = f"{speed_mb:.1f} MB/s"
+                    elapsed_str = _fmt_time_short(elapsed)
+                    msg = (f"Downloading {model_size}: {pct_str} ({dl_str})  |  "
+                           f"Finalizing & Verifying weights…  |  Elapsed: {elapsed_str}")
+                    bar_val = 0.99
+                else:
+                    pct = (total_downloaded / effective_total) if effective_total > 0 else 0.0
+                    pct = max(0.01, min(0.99, pct))
+                    pct_str = f"{int(pct * 100)}%"
+                    dl_str = f"{_fmt_size(total_downloaded)} / {_fmt_size(effective_total)}"
+                    speed_str = f"{speed_mb:.1f} MB/s"
+                    elapsed_str = _fmt_time_short(elapsed)
+                    eta_str = _fmt_time_short(eta) if eta is not None else "calculating…"
+                    msg = (f"Downloading {model_size}: {pct_str} ({dl_str})  |  Speed: {speed_str}  |  "
+                           f"Elapsed: {elapsed_str}  |  ETA: {eta_str}")
+                    bar_val = max(0.05, min(pct, 0.98))
 
-                msg = (f"Downloading {model_size}: {pct_str} ({dl_str})  |  Speed: {speed_str}  |  "
-                       f"Elapsed: {elapsed_str}  |  ETA: {eta_str}")
-                self.root.after(0, self._setstatus, msg)
-                self.root.after(0, self.progress_var.set, max(0.05, min(pct, 0.98)))
+                if not dl_active[0]:
+                    break
+
+                if msg != last_msg:
+                    last_msg = msg
+                    def _update_ui(m=msg, b=bar_val):
+                        if dl_active[0]:
+                            self._setstatus(m)
+                            self.progress_var.set(b)
+                    self.root.after(0, _update_ui)
 
         poller = threading.Thread(target=poll_progress, daemon=True)
         poller.start()
@@ -3575,21 +3625,21 @@ shortcut.Save
                 )
 
             dl_active[0] = False
-            poller.join(timeout=2.0)  # let the poller fully exit so it can't schedule a stale
-                                       # "99%..." status after this success message and clobber it
+            poller.join(timeout=1.5)
             self.cached_pages.pop("Models", None)
             self.root.after(0, self.progress_var.set, 1.0)
             self.root.after(0, self._setstatus, f"{model_size} downloaded successfully!", color=SUCCESS)
             self.root.after(0, self._refresh_model_status)
         except Exception as e:
             dl_active[0] = False
-            poller.join(timeout=2.0)
+            poller.join(timeout=1.5)
             self.root.after(0, self._setstatus, f"Download failed: {e}", color=ERROR_C)
             self.root.after(0, self._refresh_model_status)
         finally:
             dl_active[0] = False
             self.running = False
             self.root.after(0, self.gen_btn.configure, {"state": "normal"})
+            self.root.after(0, self._refresh_model_status)
 
 
 
