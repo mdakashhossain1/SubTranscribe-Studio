@@ -313,25 +313,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Windows Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: SubTranscribe-Studio-Windows
           path: release_assets/windows
 
       - name: Download Linux Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: SubTranscribe-Studio-Linux
           path: release_assets/linux
 
       - name: Download macOS Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: SubTranscribe-Studio-macOS
           path: release_assets/macos
 
       - name: Download Raspberry Pi Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: SubTranscribe-Studio-RaspberryPi
           path: release_assets/raspberrypi
