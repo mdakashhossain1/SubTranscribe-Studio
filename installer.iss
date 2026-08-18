@@ -55,32 +55,154 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 // writes under {app} (via [Files] above), so re-running this installer to
 // update to a new version never touches this folder — models and history
 // always survive an update untouched.
+//
+// Uninstall uses a single custom form with checkboxes (all unchecked by
+// default) so the user explicitly opts-in to deleting optional data.
+// The software is always removed; only the data choices differ.
+
 var
   RemoveModels, RemoveHistory: Boolean;
 
-function InitializeUninstall(): Boolean;
+// ── Custom uninstall dialog ───────────────────────────────────────────────
+procedure ShowUninstallOptionsForm;
 var
-  DataDir, ModelsDir, HistFile: String;
+  Form       : TSetupForm;
+  HeadLbl    : TLabel;
+  SubLbl     : TLabel;
+  Sep        : TBevel;
+  ModChk     : TCheckBox;
+  HistChk    : TCheckBox;
+  NoteLbl    : TLabel;
+  BtnPanel   : TPanel;
+  UninstBtn  : TButton;
+  CancelBtn  : TButton;
+  DataDir    : String;
+  ModelsDir  : String;
+  HistFile   : String;
 begin
-  // A custom TSetupForm-based checkbox dialog was tried here first, but
-  // TSetupForm is only backed by a resource embedded in the *installer*
-  // executable — the separate uninstaller stub doesn't have it, so it
-  // compiled fine but failed at runtime with "Resource TSetupForm not
-  // found." Sequential MsgBox prompts have no such resource dependency
-  // and are guaranteed available in both install and uninstall contexts.
-  Result := True;      // proceed with a normal uninstall by default
-  RemoveModels := False;
-  RemoveHistory := False;
-
-  DataDir := ExpandConstant('{localappdata}\SubTranscribe Studio');
+  DataDir   := ExpandConstant('{localappdata}\SubTranscribe Studio');
   ModelsDir := DataDir + '\models';
-  HistFile := DataDir + '\history.json';
+  HistFile  := DataDir + '\history.json';
 
-  if DirExists(ModelsDir) then
-    RemoveModels := (MsgBox('Also permanently delete the downloaded AI models (can be several GB)?', mbConfirmation, MB_YESNO) = idYes);
+  Form := CreateCustomForm();
+  Form.Caption  := 'Uninstall SubTranscribe Studio';
+  Form.Width    := 480;
+  Form.Height   := 300;
+  Form.Position := poScreenCenter;
+  Form.Color    := $160D09;  // dark background
 
-  if FileExists(HistFile) then
-    RemoveHistory := (MsgBox('Also permanently delete the transcription history log?', mbConfirmation, MB_YESNO) = idYes);
+  // Heading
+  HeadLbl         := TLabel.Create(Form);
+  HeadLbl.Parent  := Form;
+  HeadLbl.Caption := 'Remove SubTranscribe Studio?';
+  HeadLbl.Font.Style := [fsBold];
+  HeadLbl.Font.Size  := 11;
+  HeadLbl.Font.Color := $F8FAFC;
+  HeadLbl.Left    := 24;
+  HeadLbl.Top     := 20;
+  HeadLbl.Width   := 420;
+
+  // Sub-text
+  SubLbl         := TLabel.Create(Form);
+  SubLbl.Parent  := Form;
+  SubLbl.Caption := 'The application will be removed. Optionally delete stored data:';
+  SubLbl.Font.Size  := 9;
+  SubLbl.Font.Color := $B8A394;
+  SubLbl.Left    := 24;
+  SubLbl.Top     := 46;
+  SubLbl.Width   := 420;
+
+  // Separator
+  Sep          := TBevel.Create(Form);
+  Sep.Parent   := Form;
+  Sep.Left     := 24;
+  Sep.Top      := 70;
+  Sep.Width    := 420;
+  Sep.Height   := 2;
+  Sep.Shape    := bsTopLine;
+
+  // Models checkbox (only shown if models directory exists)
+  ModChk         := TCheckBox.Create(Form);
+  ModChk.Parent  := Form;
+  ModChk.Caption := 'Delete downloaded AI models  (can be several GB)';
+  ModChk.Font.Size  := 9;
+  ModChk.Font.Color := $F8FAFC;
+  ModChk.Left    := 24;
+  ModChk.Top     := 88;
+  ModChk.Width   := 420;
+  ModChk.Checked := False;
+  ModChk.Enabled := DirExists(ModelsDir);
+
+  // History checkbox (only shown if history file exists)
+  HistChk         := TCheckBox.Create(Form);
+  HistChk.Parent  := Form;
+  HistChk.Caption := 'Delete transcription history log';
+  HistChk.Font.Size  := 9;
+  HistChk.Font.Color := $F8FAFC;
+  HistChk.Left    := 24;
+  HistChk.Top     := 116;
+  HistChk.Width   := 420;
+  HistChk.Checked := False;
+  HistChk.Enabled := FileExists(HistFile);
+
+  // Note
+  NoteLbl         := TLabel.Create(Form);
+  NoteLbl.Parent  := Form;
+  NoteLbl.Caption := 'Leave boxes unchecked to keep your models and history.';
+  NoteLbl.Font.Size  := 8;
+  NoteLbl.Font.Color := $7A8A94;
+  NoteLbl.Left    := 24;
+  NoteLbl.Top     := 148;
+  NoteLbl.Width   := 420;
+
+  // Button panel
+  BtnPanel           := TPanel.Create(Form);
+  BtnPanel.Parent    := Form;
+  BtnPanel.BevelOuter := bvNone;
+  BtnPanel.Color     := $160D09;
+  BtnPanel.Left      := 0;
+  BtnPanel.Top       := Form.Height - 68;
+  BtnPanel.Width     := Form.Width;
+  BtnPanel.Height    := 56;
+
+  // Cancel button
+  CancelBtn          := TButton.Create(Form);
+  CancelBtn.Parent   := BtnPanel;
+  CancelBtn.Caption  := 'Cancel';
+  CancelBtn.Width    := 90;
+  CancelBtn.Height   := 32;
+  CancelBtn.Left     := BtnPanel.Width - 110;
+  CancelBtn.Top      := 12;
+  CancelBtn.ModalResult := mrCancel;
+
+  // Uninstall button
+  UninstBtn          := TButton.Create(Form);
+  UninstBtn.Parent   := BtnPanel;
+  UninstBtn.Caption  := 'Uninstall';
+  UninstBtn.Width    := 100;
+  UninstBtn.Height   := 32;
+  UninstBtn.Left     := BtnPanel.Width - 218;
+  UninstBtn.Top      := 12;
+  UninstBtn.ModalResult := mrOk;
+  UninstBtn.Default  := True;
+
+  if Form.ShowModal = mrOk then
+  begin
+    RemoveModels  := ModChk.Checked  and ModChk.Enabled;
+    RemoveHistory := HistChk.Checked and HistChk.Enabled;
+  end
+  else
+    Abort();  // User clicked Cancel — halt uninstall
+
+  Form.Free();
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  Result        := True;
+  RemoveModels  := False;
+  RemoveHistory := False;
+  ShowUninstallOptionsForm();
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -89,9 +211,9 @@ var
 begin
   if CurUninstallStep = usUninstall then
   begin
-    DataDir := ExpandConstant('{localappdata}\SubTranscribe Studio');
+    DataDir   := ExpandConstant('{localappdata}\SubTranscribe Studio');
     ModelsDir := DataDir + '\models';
-    HistFile := DataDir + '\history.json';
+    HistFile  := DataDir + '\history.json';
 
     if RemoveModels then
       DelTree(ModelsDir, True, True, True);
@@ -99,9 +221,7 @@ begin
     if RemoveHistory then
       DeleteFile(HistFile);
 
-    // Both categories removed and nothing else was ever written to this
-    // folder (no separate settings file exists) — clean up the now-empty
-    // shell too, so zero traces remain as promised.
+    // If both were removed and nothing else remains, clean the shell folder too
     if RemoveModels and RemoveHistory and DirExists(DataDir) then
       DelTree(DataDir, True, True, True);
   end;

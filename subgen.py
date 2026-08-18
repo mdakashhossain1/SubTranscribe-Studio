@@ -184,11 +184,11 @@ def _version_tuple(v: str):
         parts.append(int(m.group()) if m else 0)
     return tuple(parts)
 
-def check_for_update(timeout=4):
+def check_for_update(timeout=8):
     """Query the GitHub Releases API for the latest published release.
-    Returns (latest_version, release_url) if it's newer than APP_VER, else
-    None. Never raises — offline/rate-limited/blocked requests are silent
-    no-ops so this can't affect app startup or stability."""
+    Returns (latest_version, release_url, release_notes, assets) if it's
+    newer than APP_VER, else None.  Never raises — offline / rate-limited
+    requests are silent no-ops so this can't affect startup stability."""
     try:
         req = urllib.request.Request(
             f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
@@ -197,9 +197,11 @@ def check_for_update(timeout=4):
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.load(resp)
         latest = str(data.get("tag_name", "")).lstrip("vV").strip()
-        url = data.get("html_url") or f"https://github.com/{GITHUB_REPO}/releases/latest"
+        url    = data.get("html_url") or f"https://github.com/{GITHUB_REPO}/releases/latest"
+        notes  = (data.get("body") or "").strip()
+        assets = data.get("assets") or []
         if latest and _version_tuple(latest) > _version_tuple(APP_VER):
-            return latest, url
+            return latest, url, notes, assets
     except Exception:
         pass
     return None
@@ -2797,21 +2799,224 @@ shortcut.Save
         root.after) when a newer GitHub release actually exists."""
         found = check_for_update()
         if found:
-            latest, url = found
-            self.root.after(0, self._apply_update_badge, latest, url)
+            latest, url, notes, assets = found
+            self.root.after(0, self._apply_update_badge, latest, url, notes, assets)
 
-    def _apply_update_badge(self, latest_version, url):
-        self._update_url = url
+    def _apply_update_badge(self, latest_version, url, notes="", assets=None):
+        self._update_url   = url
+        self._update_notes = notes
+        self._update_assets = assets or []
+        self._update_latest = latest_version
         self.ver_badge.configure(fg_color=WARNING, border_color=WARNING)
         self.ver_badge_lbl.configure(text=f"Update v{latest_version} available", text_color="#0A0E17")
         for w in (self.ver_badge, self.ver_badge_lbl):
-            w.bind("<Button-1>", lambda e: webbrowser.open(self._update_url))
+            w.bind("<Button-1>", lambda e: self._show_update_popup(
+                self._update_latest, self._update_url,
+                self._update_notes, self._update_assets))
             w.configure(cursor="hand2")
+        # Show the update popup once automatically per session
+        if not getattr(self, "_update_popup_shown", False):
+            self._update_popup_shown = True
+            self.root.after(1500, self._show_update_popup,
+                            latest_version, url, notes, assets or [])
+
+    def _show_update_popup(self, latest, url, notes, assets):
+        """Rich update-available dialog: shows version diff, scrollable
+        changelog from GitHub release notes, and an Install Update button
+        that downloads the .exe installer and launches it automatically."""
+        if getattr(self, "_update_win", None) and self._update_win.winfo_exists():
+            self._update_win.lift()
+            return
+
+        win = ctk.CTkToplevel(self.root)
+        win.title("Update Available")
+        win.geometry("560x540")
+        win.resizable(False, False)
+        win.configure(fg_color=DARK_BG)
+        win.grab_set()
+        win.focus_force()
+        self._update_win = win
+
+        # ── Header
+        hdr = ctk.CTkFrame(win, fg_color=PANEL_BG, corner_radius=0)
+        hdr.pack(fill="x")
+        hdr_inner = ctk.CTkFrame(hdr, fg_color="transparent")
+        hdr_inner.pack(pady=18, padx=24, anchor="w")
+        up_ic = get_bs_icon("arrow-up-circle-fill", color=SUCCESS, size=28)
+        if up_ic:
+            ctk.CTkLabel(hdr_inner, image=up_ic, text="").pack(side="left", padx=(0, 10))
+        title_col = ctk.CTkFrame(hdr_inner, fg_color="transparent")
+        title_col.pack(side="left")
+        ctk.CTkLabel(title_col, text="Update Available",
+                     font=ctk.CTkFont(FONT_FAMILY, 18, "bold"),
+                     text_color=TEXT_MAIN).pack(anchor="w")
+        ctk.CTkLabel(title_col,
+                     text=f"v{APP_VER}  →  v{latest}",
+                     font=ctk.CTkFont(FONT_FAMILY, 12),
+                     text_color=ACCENT_CYAN).pack(anchor="w")
+
+        # ── Release notes
+        notes_card = ctk.CTkFrame(win, fg_color=PANEL_BG,
+                                   corner_radius=10, border_width=1,
+                                   border_color=BORDER_COLOR)
+        notes_card.pack(fill="both", expand=True, padx=20, pady=(14, 0))
+        ctk.CTkLabel(notes_card, text="What's new",
+                     font=ctk.CTkFont(FONT_FAMILY, 12, "bold"),
+                     text_color=TEXT_SUB).pack(anchor="w", padx=14, pady=(10, 4))
+
+        notes_box = ctk.CTkTextbox(notes_card, fg_color=INPUT_BG,
+                                    text_color=TEXT_MAIN,
+                                    font=ctk.CTkFont(FONT_FAMILY, 12),
+                                    corner_radius=6, border_width=0,
+                                    wrap="word")
+        notes_box.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        # Clean up GitHub markdown for plain display
+        clean = notes
+        clean = re.sub(r'^#{1,6}\s*', '', clean, flags=re.MULTILINE)  # headings
+        clean = re.sub(r'\*\*(.+?)\*\*', r'\1', clean)                # bold
+        clean = re.sub(r'\*(.+?)\*', r'\1', clean)                    # italic
+        clean = re.sub(r'^[-*]\s+', '• ', clean, flags=re.MULTILINE) # bullets
+        clean = re.sub(r'`(.+?)`', r'\1', clean)                      # inline code
+        clean = clean.strip() or "No release notes available."
+        notes_box.insert("1.0", clean)
+        notes_box.configure(state="disabled")
+
+        # ── Progress bar (hidden until download starts)
+        self._upd_prog_frame = ctk.CTkFrame(win, fg_color="transparent")
+        self._upd_prog_frame.pack(fill="x", padx=20, pady=(8, 0))
+        self._upd_prog_var = tk.DoubleVar(value=0.0)
+        self._upd_prog_lbl = ctk.CTkLabel(self._upd_prog_frame, text="",
+                                           text_color=TEXT_SUB,
+                                           font=ctk.CTkFont(FONT_FAMILY, 11))
+        self._upd_prog_lbl.pack(anchor="w")
+        self._upd_prog_bar = ctk.CTkProgressBar(self._upd_prog_frame,
+                                                 variable=self._upd_prog_var,
+                                                 fg_color=BORDER_COLOR,
+                                                 progress_color=ACCENT,
+                                                 height=6, corner_radius=3)
+        # Not packed yet — shown when download starts
+
+        # ── Buttons
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=20, pady=14)
+
+        later_btn = ctk.CTkButton(
+            btn_row, text="Later", width=100, height=36,
+            corner_radius=8, fg_color=INPUT_BG,
+            border_width=1, border_color=BORDER_COLOR,
+            text_color=TEXT_SUB, hover_color=BORDER_COLOR,
+            font=ctk.CTkFont(FONT_FAMILY, 13),
+            command=win.destroy)
+        later_btn.pack(side="right", padx=(6, 0))
+
+        view_btn = ctk.CTkButton(
+            btn_row, text="View on GitHub", width=140, height=36,
+            corner_radius=8, fg_color=INPUT_BG,
+            border_width=1, border_color=BORDER_COLOR,
+            text_color=TEXT_SUB, hover_color=BORDER_COLOR,
+            font=ctk.CTkFont(FONT_FAMILY, 13),
+            command=lambda: webbrowser.open(url))
+        view_btn.pack(side="right", padx=(6, 0))
+
+        self._install_btn = ctk.CTkButton(
+            btn_row, text="  Install Update", width=160, height=36,
+            corner_radius=8, fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            text_color="#FFFFFF", font=ctk.CTkFont(FONT_FAMILY, 13, "bold"),
+            image=get_bs_icon("download", color="#FFFFFF", size=16),
+            command=lambda: threading.Thread(
+                target=self._download_and_run_update,
+                args=(assets, latest, later_btn, view_btn),
+                daemon=True).start())
+        self._install_btn.pack(side="right")
+
+    def _download_and_run_update(self, assets, version, later_btn, view_btn):
+        """Background thread: find the Windows .exe installer in the release
+        assets, download it with a live progress bar, then launch it and
+        exit the app so the installer can overwrite running files cleanly."""
+        import tempfile
+
+        def _ui(fn, *a): self.root.after(0, fn, *a)
+
+        def _set_lbl(t): self._upd_prog_lbl.configure(text=t)
+        def _set_prog(v): self._upd_prog_var.set(v)
+        def _disable_btns():
+            self._install_btn.configure(state="disabled", text="  Downloading…")
+            later_btn.configure(state="disabled")
+            view_btn.configure(state="disabled")
+            self._upd_prog_bar.pack(fill="x", pady=(4, 0))
+
+        _ui(_disable_btns)
+
+        # Find the Windows installer asset
+        exe_url = None
+        for asset in assets:
+            name = (asset.get("name") or "").lower()
+            if name.endswith(".exe") and "setup" in name:
+                exe_url = asset.get("browser_download_url")
+                break
+        # Fallback: any .exe asset
+        if not exe_url:
+            for asset in assets:
+                name = (asset.get("name") or "").lower()
+                if name.endswith(".exe"):
+                    exe_url = asset.get("browser_download_url")
+                    break
+
+        if not exe_url:
+            # No installer asset — fall back to browser
+            _ui(_set_lbl, "No installer found in release. Opening GitHub…")
+            webbrowser.open(self._update_url)
+            _ui(self._install_btn.configure, state="normal",
+                text="  Install Update")
+            _ui(later_btn.configure, state="normal")
+            _ui(view_btn.configure, state="normal")
+            return
+
+        tmp_path = os.path.join(tempfile.gettempdir(),
+                                f"SubTranscribeStudio_v{version}_setup.exe")
+        try:
+            _ui(_set_lbl, f"Downloading v{version} installer…")
+            req = urllib.request.Request(exe_url,
+                headers={"User-Agent": "SubTranscribe-Studio"})
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                total = int(resp.headers.get("Content-Length", 0) or 0)
+                downloaded = 0
+                chunk = 65536
+                with open(tmp_path, "wb") as f:
+                    while True:
+                        buf = resp.read(chunk)
+                        if not buf:
+                            break
+                        f.write(buf)
+                        downloaded += len(buf)
+                        if total > 0:
+                            pct = downloaded / total
+                            mb_done = downloaded / 1_048_576
+                            mb_tot  = total / 1_048_576
+                            _ui(_set_prog, pct)
+                            _ui(_set_lbl,
+                                f"Downloading… {mb_done:.1f} / {mb_tot:.1f} MB")
+
+            _ui(_set_prog, 1.0)
+            _ui(_set_lbl, "Download complete. Launching installer…")
+            import time as _time
+            _time.sleep(1.0)
+            subprocess.Popen([tmp_path], creationflags=getattr(subprocess,
+                             "CREATE_NO_WINDOW", 0))
+            _ui(self.root.destroy)
+
+        except Exception as exc:
+            _ui(_set_lbl, f"Download failed: {exc}")
+            _ui(self._install_btn.configure, state="normal",
+                text="  Install Update")
+            _ui(later_btn.configure, state="normal")
+            _ui(view_btn.configure, state="normal")
 
     def _manual_check_for_update(self):
         """Explicit "Check for Updates" button on the About page — gives
         feedback either way (unlike the silent startup check), so the
-        feature is actually visible/discoverable when nothing's new."""
+        feature is always discoverable."""
         if hasattr(self, "check_update_btn"):
             self.check_update_btn.configure(state="disabled")
         if hasattr(self, "update_status_var"):
@@ -2828,11 +3033,13 @@ shortcut.Save
         if not hasattr(self, "update_status_var"):
             return
         if found:
-            latest, url = found
-            self._apply_update_badge(latest, url)
-            self.update_status_var.set(f"Update available: v{latest}  (you're on v{APP_VER})")
-            self.check_update_btn.configure(text="Download Update",
-                                            command=lambda: webbrowser.open(url))
+            latest, url, notes, assets = found
+            self._apply_update_badge(latest, url, notes, assets)
+            self.update_status_var.set(
+                f"Update available: v{latest}  (you're on v{APP_VER})")
+            self.check_update_btn.configure(
+                text="  View Update",
+                command=lambda: self._show_update_popup(latest, url, notes, assets))
         else:
             self.update_status_var.set(f"You're on the latest version (v{APP_VER}).")
 
