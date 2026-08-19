@@ -65,7 +65,6 @@ var
   UninstallForm: TSetupForm;
   InfoLabel: TNewStaticText;
   CleanCheckBox: TNewCheckBox;
-  ButtonsDivider: TBevel;
   BtnUninstall, BtnCancel: TNewButton;
   HasDataDir: Boolean;
   FormHeight: Integer;
@@ -78,7 +77,7 @@ begin
   // Single wizard-styled confirmation dialog (built from the same native
   // controls the install wizard uses) instead of two chained native
   // MsgBox() popups — one checkbox covers the cleanup choice.
-  UninstallForm := CreateCustomForm();
+  UninstallForm := TSetupForm.Create(nil);
   try
     FormHeight := 170;
     if HasDataDir then
@@ -113,14 +112,6 @@ begin
     end
     else
       CleanCheckBox := nil;
-
-    ButtonsDivider := TBevel.Create(UninstallForm);
-    ButtonsDivider.Parent := UninstallForm;
-    ButtonsDivider.Left := 0;
-    ButtonsDivider.Top := UninstallForm.ClientHeight - ScaleY(52);
-    ButtonsDivider.Width := UninstallForm.ClientWidth;
-    ButtonsDivider.Height := 1;
-    ButtonsDivider.Shape := bsTopLine;
 
     BtnCancel := TNewButton.Create(UninstallForm);
     BtnCancel.Parent := UninstallForm;
