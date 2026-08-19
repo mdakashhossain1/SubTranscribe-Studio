@@ -121,9 +121,10 @@ class DashboardPage(QWidget):
 
     # ── 1. Configuration & AI Model ─────────────────────────────────
     def _build_config_card(self) -> QWidget:
-        card, body = make_card("2. Configuration & AI Model")
+        card, body = make_card("1. Configuration & AI Model", icon_name="gear-wide-connected")
 
         row1 = QHBoxLayout()
+
         row1.setSpacing(12)
         self.model_combo = self._labeled_combo(row1, "Whisper Model", MODEL_SIZES)
         self.model_combo.currentTextChanged.connect(self._on_model_changed)
@@ -256,12 +257,9 @@ class DashboardPage(QWidget):
 
     # ── 2. Advanced Settings ─────────────────────────────────────────
     def _build_advanced_card(self) -> QWidget:
-        card, body = make_card("")
-        hdr = QHBoxLayout()
-        title_lbl = QLabel("3. Advanced Settings")
-        title_lbl.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 15px; font-weight: 700; border: none;")
-        hdr.addWidget(title_lbl)
-        hdr.addStretch(1)
+        card, body = make_card("2. Advanced Settings", icon_name="lightning-charge-fill")
+        hdr = card.layout().itemAt(0).layout()
+
         reset_btn = QPushButton("  Reset to Best (Auto)")
         reset_btn.setIcon(get_bs_icon("stars", color=ACCENT, size=14))
         reset_btn.setStyleSheet(f"""
@@ -273,9 +271,9 @@ class DashboardPage(QWidget):
         """)
         reset_btn.clicked.connect(self._reset_to_best)
         hdr.addWidget(reset_btn)
-        body.addLayout(hdr)
 
         row1 = QHBoxLayout()
+
         row1.setSpacing(12)
         self.compute_combo = self._labeled_combo(row1, "Compute Type",
             ["float16", "int8", "int8_float16", "float32"] if DEVICE == "cuda" else ["int8", "float32"])
@@ -394,19 +392,16 @@ class DashboardPage(QWidget):
 
     # ── 3. Real-Time Progress & Telemetry ────────────────────────────
     def _build_telemetry_card(self) -> QWidget:
-        card, body = make_card("")
-        hdr = QHBoxLayout()
-        title_lbl = QLabel("Real-Time Progress & Telemetry")
-        title_lbl.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 15px; font-weight: 700; border: none;")
-        hdr.addWidget(title_lbl)
-        hdr.addStretch(1)
+        card, body = make_card("Real-Time Progress & Telemetry", icon_name="activity")
+        hdr = card.layout().itemAt(0).layout()
+
         clear_btn = QPushButton("Clear")
         clear_btn.setStyleSheet(BTN_SECONDARY_STYLE)
         clear_btn.clicked.connect(self._clear_telemetry)
         hdr.addWidget(clear_btn)
         self.live_indicator = LiveStatusIndicator()
         hdr.addWidget(self.live_indicator)
-        body.addLayout(hdr)
+
 
 
         tiles_row = QHBoxLayout()
@@ -456,22 +451,20 @@ class DashboardPage(QWidget):
 
     # ── 4. Live Transcript Studio ────────────────────────────────────
     def _build_transcript_card(self) -> QWidget:
-        card, body = make_card("")
-        hdr = QHBoxLayout()
-        title_lbl = QLabel("Live Transcript Studio")
-        title_lbl.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 15px; font-weight: 700; border: none;")
-        hdr.addWidget(title_lbl)
-        hdr.addStretch(1)
+        card, body = make_card("Live Transcript Studio", icon_name="translate")
+
+        hdr = card.layout().itemAt(0).layout()
+
         save_btn = QPushButton("  Save Corrections")
         save_btn.setIcon(get_bs_icon("check-circle-fill", color=SUCCESS, size=14))
         save_btn.setStyleSheet(BTN_SECONDARY_STYLE)
         save_btn.clicked.connect(self._save_corrections)
         hdr.addWidget(save_btn)
-        body.addLayout(hdr)
 
         self.filter_edit = QLineEdit()
-        self.filter_edit.setPlaceholderText("Filter transcript…")
+        self.filter_edit.setPlaceholderText("Filter transcript text…")
         self.filter_edit.setStyleSheet(LINEEDIT_STYLE)
+        self.filter_edit.setFixedHeight(34)
         self.filter_edit.textChanged.connect(self._apply_filter)
         body.addWidget(self.filter_edit)
 
@@ -484,16 +477,33 @@ class DashboardPage(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setMinimumHeight(220)
+        self.table.setMinimumHeight(240)
         self.table.setStyleSheet(f"""
             QTableWidget {{
-                background-color: {INPUT_BG}; color: {TEXT_MAIN};
-                border: 1px solid {BORDER_COLOR}; border-radius: 6px; gridline-color: {BORDER_COLOR};
+                background-color: {INPUT_BG};
+                color: {TEXT_MAIN};
+                border: 1px solid {BORDER_COLOR};
+                border-radius: 8px;
+                gridline-color: {BORDER_COLOR};
+                font-size: 12px;
             }}
             QHeaderView::section {{
-                background-color: {CARD_BG}; color: {TEXT_SUB}; border: none;
-                border-bottom: 1px solid {BORDER_COLOR}; padding: 6px; font-weight: 700;
+                background-color: {CARD_BG};
+                color: {TEXT_SUB};
+                border: none;
+                border-bottom: 1px solid {BORDER_COLOR};
+                padding: 8px 10px;
+                font-weight: 700;
+                font-size: 11px;
             }}
+            QTableWidget::item {{
+                padding: 6px 8px;
+            }}
+            QTableWidget::item:selected {{
+                background-color: {ACCENT};
+                color: #FFFFFF;
+            }}
+            {SCROLLBAR_STYLE}
         """)
         self.table.cellDoubleClicked.connect(self._on_row_double_clicked)
         body.addWidget(self.table, 1)
@@ -539,14 +549,17 @@ class DashboardPage(QWidget):
     #    pages/transcribe.py, plus zoom controls) ──────────────────────
     def _build_audio_preview(self) -> QWidget:
         wrap = QFrame()
-        wrap.setStyleSheet("border: none;")
+        wrap.setStyleSheet("border: none; background: transparent;")
         outer = QVBoxLayout(wrap)
-        outer.setContentsMargins(0, 8, 0, 0)
+        outer.setContentsMargins(0, 4, 0, 0)
+        outer.setSpacing(6)
+
         controls = QHBoxLayout()
+        controls.setSpacing(8)
 
         self.play_btn = QPushButton()
         self.play_btn.setIcon(get_bs_icon("play-fill", color="#FFFFFF", size=16))
-        self.play_btn.setFixedWidth(40)
+        self.play_btn.setFixedSize(36, 32)
         self.play_btn.setStyleSheet(BTN_PRIMARY_STYLE)
         self.play_btn.setEnabled(False)
         self.play_btn.clicked.connect(self._toggle_playback)
@@ -554,13 +567,13 @@ class DashboardPage(QWidget):
 
         self.mute_btn = QPushButton()
         self.mute_btn.setIcon(get_bs_icon("volume-up-fill", color=TEXT_SUB, size=16))
-        self.mute_btn.setFixedWidth(40)
+        self.mute_btn.setFixedSize(36, 32)
         self.mute_btn.setStyleSheet(BTN_SECONDARY_STYLE)
         self.mute_btn.clicked.connect(self._toggle_mute)
         controls.addWidget(self.mute_btn)
 
         self.audio_time_lbl = QLabel("00:00:00 / 0s")
-        self.audio_time_lbl.setStyleSheet(f"color: {TEXT_SUB}; font-size: 12px;")
+        self.audio_time_lbl.setStyleSheet(f"color: {TEXT_SUB}; font-size: 12px; font-weight: 600; border: none;")
         controls.addWidget(self.audio_time_lbl)
         controls.addStretch(1)
 
@@ -573,7 +586,7 @@ class DashboardPage(QWidget):
             ic = get_bs_icon(icon_name, color=TEXT_SUB, size=14)
             if ic:
                 btn.setIcon(ic)
-            btn.setFixedWidth(32)
+            btn.setFixedSize(32, 32)
             btn.setStyleSheet(BTN_SECONDARY_STYLE)
             btn.clicked.connect(handler)
             controls.addWidget(btn)
@@ -581,8 +594,12 @@ class DashboardPage(QWidget):
         outer.addLayout(controls)
 
         self.waveform = WaveformBar()
+        self.waveform.setMinimumHeight(44)
         self.waveform.seekRequested.connect(self._on_waveform_seek)
         outer.addWidget(self.waveform)
+
+        return wrap
+
 
         return wrap
 
