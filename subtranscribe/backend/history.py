@@ -39,11 +39,24 @@ def clear_history():
             pass
 
 
-def delete_history_entry(entry_id):
+def delete_history_entry(entry_id, match_item=None):
     hist_file = DATA_DIR / "history.json"
-    hist = [h for h in get_history() if h.get("id") != entry_id]
+    str_eid = str(entry_id) if entry_id is not None else ""
+    hist = get_history()
+    new_hist = []
+    for h in hist:
+        h_id = str(h.get("id")) if h.get("id") is not None else ""
+        if str_eid and h_id and h_id == str_eid:
+            continue
+        if match_item:
+            if (h.get("media_file") == match_item.get("media_file") and
+                h.get("timestamp") == match_item.get("timestamp") and
+                h.get("subtitle_path") == match_item.get("subtitle_path")):
+                continue
+        new_hist.append(h)
     try:
         with open(hist_file, "w", encoding="utf-8") as f:
-            json.dump(hist, f, indent=2)
+            json.dump(new_hist, f, indent=2)
     except Exception:
         pass
+

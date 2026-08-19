@@ -17,8 +17,9 @@ from ..config import (
     DARK_BG, INPUT_BG, PANEL_BG, BORDER_COLOR, TEXT_MAIN, TEXT_SUB,
     ACCENT, ACCENT_HOVER, ACCENT_CYAN, SUCCESS, ERROR_C,
 )
+from ..icons import get_bs_icon
 from ..widgets.cards import make_card
-from ..widgets.styles import BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE, BTN_DANGER_STYLE
+from ..widgets.styles import BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE, BTN_DANGER_STYLE, SCROLLBAR_STYLE
 
 _MEDIA_FILTER = "Media Files (*.mp4 *.mkv *.avi *.mov *.webm *.mp3 *.wav *.m4a *.flac *.ogg *.aac);;All Files (*)"
 
@@ -31,8 +32,10 @@ class BatchPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
@@ -46,11 +49,18 @@ class BatchPage(QWidget):
         card, body = make_card("Batch Subtitle Processing Queue")
 
         bar = QHBoxLayout()
-        add_btn = QPushButton("Add Media Files")
+        add_btn = QPushButton("  Add Media Files")
+        add_ic = get_bs_icon("folder2-open", color="#FFFFFF", size=14)
+        if add_ic:
+            add_btn.setIcon(add_ic)
         add_btn.setStyleSheet(BTN_PRIMARY_STYLE)
         add_btn.clicked.connect(self._add_files)
         bar.addWidget(add_btn)
-        clear_btn = QPushButton("Clear Queue")
+
+        clear_btn = QPushButton("  Clear Queue")
+        clear_ic = get_bs_icon("trash-fill", color=TEXT_SUB, size=13)
+        if clear_ic:
+            clear_btn.setIcon(clear_ic)
         clear_btn.setStyleSheet(BTN_SECONDARY_STYLE)
         clear_btn.clicked.connect(self._clear_queue)
         bar.addWidget(clear_btn)
@@ -61,7 +71,10 @@ class BatchPage(QWidget):
         self.rows_layout.setSpacing(4)
         body.addLayout(self.rows_layout)
 
-        start_btn = QPushButton("Start Batch Processing")
+        start_btn = QPushButton("  Start Batch Processing")
+        play_ic = get_bs_icon("play-fill", color="#FFFFFF", size=16)
+        if play_ic:
+            start_btn.setIcon(play_ic)
         start_btn.setStyleSheet(BTN_PRIMARY_STYLE)
         start_btn.setMinimumHeight(44)
         start_btn.clicked.connect(self._start_batch)
@@ -71,6 +84,7 @@ class BatchPage(QWidget):
         layout.addStretch(1)
 
         self._refresh_rows()
+
 
     def _add_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Add Media Files", "", _MEDIA_FILTER)
@@ -125,7 +139,10 @@ class BatchPage(QWidget):
         status_lbl.setStyleSheet(f"color: {status_col}; font-weight: 700; border: none;")
         h.addWidget(status_lbl)
 
-        remove_btn = QPushButton("Remove")
+        remove_btn = QPushButton("  Remove")
+        trash_ic = get_bs_icon("trash-fill", color="#EF4444", size=13)
+        if trash_ic:
+            remove_btn.setIcon(trash_ic)
         remove_btn.setStyleSheet(BTN_DANGER_STYLE)
         remove_btn.clicked.connect(lambda: self._remove_item(idx - 1))
         h.addWidget(remove_btn)

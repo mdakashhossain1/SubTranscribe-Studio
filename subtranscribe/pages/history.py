@@ -6,23 +6,47 @@ import subprocess
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter, QFontMetrics, QColor
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QScrollArea,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QScrollArea, QSizePolicy, QMessageBox,
 )
 
 from ..backend.history import get_history, delete_history_entry
-from ..config import DARK_BG, INPUT_BG, PANEL_BG, BORDER_COLOR, TEXT_MAIN, TEXT_SUB, ACCENT_CYAN, SUCCESS, ERROR_C
+from ..config import DARK_BG, INPUT_BG, PANEL_BG, BORDER_COLOR, TEXT_MAIN, TEXT_SUB, ACCENT, ACCENT_HOVER, ACCENT_CYAN, SUCCESS, ERROR_C
+from ..icons import get_bs_icon
 from ..widgets.cards import make_card
-from ..widgets.styles import BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE, BTN_DANGER_STYLE
+from ..widgets.styles import BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE, BTN_DANGER_STYLE, SCROLLBAR_STYLE
 
 
-def _open_path(path: str):
-    if sys.platform == "win32":
-        os.startfile(path)
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", path])
-    else:
-        subprocess.Popen(["xdg-open", path])
+
+class ElidedLabel(QLabel):
+    """Label that elides text in the middle when space is constrained."""
+
+    def __init__(self, text="", color=TEXT_MAIN, bold=True, parent=None):
+        super().__init__(parent)
+        self._full_text = text
+        self._color = QColor(color)
+        self.setToolTip(text)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.setMinimumWidth(60)
+        font = self.font()
+        font.setBold(bold)
+        self.setFont(font)
+        self.setStyleSheet("border: none; background: transparent;")
+
+    def setText(self, text):
+        self._full_text = text
+        self.setToolTip(text)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        metrics = QFontMetrics(self.font())
+        elided = metrics.elidedText(self._full_text, Qt.ElideMiddle, self.width())
+        painter.setPen(self._color)
+        painter.setFont(self.font())
+        painter.drawText(self.rect(), self.alignment() | Qt.AlignVCenter, elided)
 
 
 class HistoryPage(QWidget):
@@ -32,8 +56,10 @@ class HistoryPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
@@ -51,8 +77,11 @@ class HistoryPage(QWidget):
         desc.setStyleSheet(f"color: {TEXT_SUB}; font-size: 12px; border: none;")
         bar.addWidget(desc)
         bar.addStretch(1)
-        clear_btn = QPushButton("Clear History")
-        clear_btn.setStyleSheet(BTN_SECONDARY_STYLE)
+        clear_btn = QPushButton("  Clear History")
+        clear_icon = get_bs_icon("trash-fill", color="#EF4444", size=13)
+        if clear_icon:
+            clear_btn.setIcon(clear_icon)
+        clear_btn.setStyleSheet(BTN_DANGER_STYLE)
         clear_btn.clicked.connect(self._clear_history)
         bar.addWidget(clear_btn)
         self.body.addLayout(bar)
@@ -94,7 +123,8 @@ class HistoryPage(QWidget):
         row = QFrame()
         row.setStyleSheet(f"background-color: {INPUT_BG if idx % 2 == 0 else PANEL_BG}; border: 1px solid {BORDER_COLOR}; border-radius: 6px;")
         h = QHBoxLayout(row)
-        h.setContentsMargins(10, 6, 10, 6)
+        h.setContentsMargins(12, 6, 12, 6)
+        h.setSpacing(8)
 
         def lbl(text, color=TEXT_MAIN, bold=True, width=None):
             l = QLabel(text)
@@ -104,38 +134,112 @@ class HistoryPage(QWidget):
                 l.setFixedWidth(width)
             return l
 
-        h.addWidget(lbl(str(idx), TEXT_SUB, False, 30))
-        h.addWidget(lbl(media_file, TEXT_MAIN, True), 1)
-        h.addWidget(lbl(model_name, ACCENT_CYAN, True, 110))
-        h.addWidget(lbl(fmt_name, TEXT_MAIN, True, 60))
-        h.addWidget(lbl(timestamp, TEXT_SUB, False, 150))
-        h.addWidget(lbl("Completed", SUCCESS, True, 90))
+        h.addWidget(lbl(str(idx), TEXT_SUB, False, 24))
+        h.addWidget(ElidedLabel(media_file, TEXT_MAIN, True), 1)
+        h.addWidget(lbl(model_name, ACCENT_CYAN, True, 85))
+        h.addWidget(lbl(fmt_name, TEXT_MAIN, True, 45))
+        h.addWidget(lbl(timestamp, TEXT_SUB, False, 125))
+        h.addWidget(lbl("Completed", SUCCESS, True, 75))
+
+        btn_style_primary = f"""
+            QPushButton {{
+                background-color: {ACCENT}; color: white; border: none;
+                border-radius: 5px; padding: 6px 12px; font-weight: 700; font-size: 11px;
+            }}
+            QPushButton:hover {{ background-color: {ACCENT_HOVER}; }}
+        """
+        btn_style_sec = f"""
+            QPushButton {{
+                background-color: transparent; color: {TEXT_SUB};
+                border: 1px solid {BORDER_COLOR}; border-radius: 5px; padding: 6px 10px; font-size: 11px;
+            }}
+            QPushButton:hover {{ color: {TEXT_MAIN}; border-color: {ACCENT}; }}
+        """
+        btn_style_danger = f"""
+            QPushButton {{
+                background-color: transparent; color: #EF4444;
+                border: 1px solid {BORDER_COLOR}; border-radius: 5px; padding: 6px 10px; font-size: 11px;
+            }}
+            QPushButton:hover {{ background-color: {INPUT_BG}; }}
+        """
 
         if sub_path and os.path.exists(sub_path):
-            open_btn = QPushButton("Open File")
-            open_btn.setStyleSheet(BTN_PRIMARY_STYLE)
-            open_btn.clicked.connect(lambda p=sub_path: _open_path(p))
+            open_btn = QPushButton("  Open File")
+            open_ic = get_bs_icon("file-earmark-code-fill", color="#FFFFFF", size=13)
+            if open_ic:
+                open_btn.setIcon(open_ic)
+            open_btn.setStyleSheet(btn_style_primary)
+            open_btn.clicked.connect(lambda checked=False, p=sub_path: self._open_file(p))
             h.addWidget(open_btn)
 
         out_dir = str(Path(sub_path).parent) if sub_path else ""
         if out_dir and os.path.isdir(out_dir):
-            folder_btn = QPushButton("Open Folder")
-            folder_btn.setStyleSheet(BTN_SECONDARY_STYLE)
-            folder_btn.clicked.connect(lambda d=out_dir: _open_path(d))
+            folder_btn = QPushButton("  Open Folder")
+            folder_ic = get_bs_icon("folder2-open", color=TEXT_SUB, size=13)
+            if folder_ic:
+                folder_btn.setIcon(folder_ic)
+            folder_btn.setStyleSheet(btn_style_sec)
+            folder_btn.clicked.connect(lambda checked=False, p=sub_path: self._open_folder(p))
             h.addWidget(folder_btn)
 
-        remove_btn = QPushButton("Remove")
-        remove_btn.setStyleSheet(BTN_DANGER_STYLE)
-        remove_btn.clicked.connect(lambda eid=entry_id: self._remove_entry(eid))
+        remove_btn = QPushButton("  Delete")
+        trash_ic = get_bs_icon("trash-fill", color="#EF4444", size=13)
+        if trash_ic:
+            remove_btn.setIcon(trash_ic)
+        remove_btn.setStyleSheet(btn_style_danger)
+        remove_btn.clicked.connect(lambda checked=False, eid=entry_id, it=item: self._remove_entry(eid, it))
         h.addWidget(remove_btn)
+
 
         return row
 
-    def _remove_entry(self, entry_id: str):
-        delete_history_entry(entry_id)
+    def _open_file(self, path: str):
+        if not path or not os.path.exists(path):
+            QMessageBox.warning(self, "File Not Found", f"The subtitle file no longer exists on disk:\n\n{path}")
+            return
+        try:
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+        except Exception:
+            if sys.platform == "win32":
+                try:
+                    subprocess.Popen(["notepad.exe", path])
+                except Exception as e:
+                    QMessageBox.warning(self, "Open Error", f"Could not open file:\n{e}")
+            else:
+                QMessageBox.warning(self, "Open Error", f"Could not open file:\n{path}")
+
+    def _open_folder(self, path: str):
+        if not path:
+            return
+        folder = path if os.path.isdir(path) else str(Path(path).parent)
+        if not os.path.exists(folder):
+            QMessageBox.warning(self, "Folder Not Found", f"The folder no longer exists on disk:\n\n{folder}")
+            return
+        try:
+            if sys.platform == "win32":
+                if os.path.isfile(path):
+                    subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
+                else:
+                    os.startfile(folder)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", folder])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+        except Exception as e:
+            QMessageBox.warning(self, "Open Folder Error", f"Could not open folder:\n{e}")
+
+    def _remove_entry(self, entry_id: str, item: dict):
+        delete_history_entry(entry_id, match_item=item)
         self._refresh_rows()
 
     def _clear_history(self):
         from ..backend.history import clear_history
         clear_history()
         self._refresh_rows()
+
+

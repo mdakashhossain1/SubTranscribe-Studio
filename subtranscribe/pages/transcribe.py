@@ -29,8 +29,9 @@ from ..widgets.language_select import LanguageSelect
 from ..widgets.styles import (
     COMBO_STYLE as _COMBO_STYLE, LINEEDIT_STYLE as _LINEEDIT_STYLE,
     BTN_PRIMARY_STYLE as _BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE as _BTN_SECONDARY_STYLE,
-    PROGRESSBAR_STYLE, TEXTEDIT_STYLE, FIELD_LABEL_STYLE,
+    PROGRESSBAR_STYLE, TEXTEDIT_STYLE, FIELD_LABEL_STYLE, SCROLLBAR_STYLE, CHECKBOX_STYLE,
 )
+
 from ..widgets.waveform import WaveformBar
 from ..workers import TranscribeWorker, WaveformWorker
 
@@ -56,8 +57,10 @@ class TranscribePage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
@@ -241,6 +244,8 @@ class TranscribePage(QWidget):
 
     def _labeled_combo(self, row: QHBoxLayout, label: str, values: list[str]) -> QComboBox:
         col = QVBoxLayout()
+        col.setSpacing(4)
+        col.setContentsMargins(0, 0, 0, 0)
         col.addWidget(_field_label(label))
         combo = QComboBox()
         combo.addItems(values)
@@ -251,6 +256,8 @@ class TranscribePage(QWidget):
 
     def _labeled_lang_select(self, row: QHBoxLayout, label: str, values: list[str]) -> LanguageSelect:
         col = QVBoxLayout()
+        col.setSpacing(4)
+        col.setContentsMargins(0, 0, 0, 0)
         col.addWidget(_field_label(label))
         combo = LanguageSelect(values)
         combo.setStyleSheet(_COMBO_STYLE)
@@ -265,15 +272,19 @@ class TranscribePage(QWidget):
         row.setSpacing(16)
 
         col1 = QVBoxLayout()
+        col1.setSpacing(4)
+        col1.setContentsMargins(0, 0, 0, 0)
         col1.addWidget(_field_label("Beam Size"))
         self.beam_spin = QSpinBox()
         self.beam_spin.setRange(1, 10)
         self.beam_spin.setValue(self.state.beam_size)
         self.beam_spin.setStyleSheet(_LINEEDIT_STYLE)
         col1.addWidget(self.beam_spin)
-        row.addLayout(col1)
+        row.addLayout(col1, 1)
 
         col2 = QVBoxLayout()
+        col2.setSpacing(4)
+        col2.setContentsMargins(0, 0, 0, 0)
         col2.addWidget(_field_label("Temperature"))
         self.temp_spin = QDoubleSpinBox()
         self.temp_spin.setRange(0.0, 1.0)
@@ -281,29 +292,35 @@ class TranscribePage(QWidget):
         self.temp_spin.setValue(self.state.temperature)
         self.temp_spin.setStyleSheet(_LINEEDIT_STYLE)
         col2.addWidget(self.temp_spin)
-        row.addLayout(col2)
+        row.addLayout(col2, 1)
 
         col3 = QVBoxLayout()
+        col3.setSpacing(4)
+        col3.setContentsMargins(0, 0, 0, 0)
         col3.addWidget(_field_label("Max Words / Chunk"))
         self.max_words_spin = QSpinBox()
         self.max_words_spin.setRange(1, 12)
         self.max_words_spin.setValue(self.state.max_words)
         self.max_words_spin.setStyleSheet(_LINEEDIT_STYLE)
         col3.addWidget(self.max_words_spin)
-        row.addLayout(col3)
+        row.addLayout(col3, 1)
 
         col4 = QVBoxLayout()
+        col4.setSpacing(4)
+        col4.setContentsMargins(0, 0, 0, 0)
         self.cond_prev_check = QCheckBox("Condition on previous text")
-        self.cond_prev_check.setStyleSheet(f"color: {TEXT_SUB};")
+        self.cond_prev_check.setStyleSheet(CHECKBOX_STYLE)
         col4.addWidget(self.cond_prev_check)
         self.word_ts_check = QCheckBox("Word-level timestamps")
         self.word_ts_check.setChecked(self.state.word_timestamps)
-        self.word_ts_check.setStyleSheet(f"color: {TEXT_SUB};")
+        self.word_ts_check.setStyleSheet(CHECKBOX_STYLE)
         col4.addWidget(self.word_ts_check)
         row.addLayout(col4, 1)
 
         body.addLayout(row)
         return card
+
+
 
     # ── Generate button ──────────────────────────────────────────
     def _build_generate_row(self) -> QHBoxLayout:

@@ -20,20 +20,19 @@ both originally-reported bugs lived:
 """
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QStandardItemModel, QStandardItem
-from PySide6.QtWidgets import QComboBox, QCompleter
+from PySide6.QtWidgets import QComboBox
 
 from ..config import FLAG_ICON_MAP
 from ..icons import get_flag_icon
 
 
 class LanguageSelect(QComboBox):
-    """Editable, type-to-filter QComboBox with a flag icon per language."""
+    """QComboBox with a flag icon per language."""
 
     valueChanged = Signal(str)
 
     def __init__(self, values: list[str], parent=None):
         super().__init__(parent)
-        self.setEditable(True)
         self.setInsertPolicy(QComboBox.NoInsert)
 
         model = QStandardItemModel(self)
@@ -46,12 +45,6 @@ class LanguageSelect(QComboBox):
             model.appendRow(item)
         self.setModel(model)
 
-        completer = QCompleter(model, self)
-        completer.setCaseSensitivity(Qt.CaseInsensitive)
-        completer.setFilterMode(Qt.MatchContains)
-        completer.setCompletionMode(QCompleter.PopupCompletion)
-        self.setCompleter(completer)
-
         self.currentTextChanged.connect(self.valueChanged.emit)
 
     def setCurrentValue(self, name: str):
@@ -63,3 +56,7 @@ class LanguageSelect(QComboBox):
 
     def currentValue(self) -> str:
         return self.currentText()
+
+    def wheelEvent(self, event):
+        event.ignore()
+

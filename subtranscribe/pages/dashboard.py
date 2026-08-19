@@ -33,12 +33,15 @@ from ..config import (
 )
 from ..icons import get_bs_icon
 from ..paths import FFMPEG_PATH
-from ..widgets.cards import make_card, make_stat_tile
+from ..widgets.cards import make_card, make_stat_tile, LiveStatusIndicator
+
 from ..widgets.language_select import LanguageSelect
 from ..widgets.styles import (
     COMBO_STYLE, LINEEDIT_STYLE, BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE,
-    PROGRESSBAR_STYLE, FIELD_LABEL_STYLE,
+    PROGRESSBAR_STYLE, FIELD_LABEL_STYLE, SCROLLBAR_STYLE, CHECKBOX_STYLE,
 )
+
+
 from ..widgets.waveform import WaveformBar
 from ..workers import TranscribeWorker, WaveformWorker, DownloadWorker
 from .models import _MODEL_COPY
@@ -87,7 +90,8 @@ class DashboardPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
@@ -171,6 +175,8 @@ class DashboardPage(QWidget):
 
     def _labeled_combo(self, row: QHBoxLayout, label: str, values: list[str]) -> QComboBox:
         col = QVBoxLayout()
+        col.setSpacing(4)
+        col.setContentsMargins(0, 0, 0, 0)
         col.addWidget(_field_label(label))
         combo = QComboBox()
         combo.addItems(values)
@@ -181,12 +187,15 @@ class DashboardPage(QWidget):
 
     def _labeled_lang_select(self, row: QHBoxLayout, label: str, values: list[str]) -> LanguageSelect:
         col = QVBoxLayout()
+        col.setSpacing(4)
+        col.setContentsMargins(0, 0, 0, 0)
         col.addWidget(_field_label(label))
         combo = LanguageSelect(values)
         combo.setStyleSheet(COMBO_STYLE)
         col.addWidget(combo)
         row.addLayout(col, 1)
         return combo
+
 
     def _pill_label(self, row: QHBoxLayout, text: str, color: str) -> QLabel:
         """Same visual as _pill() but keeps a direct reference to the text
@@ -270,25 +279,32 @@ class DashboardPage(QWidget):
         row1.setSpacing(12)
         self.compute_combo = self._labeled_combo(row1, "Compute Type",
             ["float16", "int8", "int8_float16", "float32"] if DEVICE == "cuda" else ["int8", "float32"])
+
         col_beam = QVBoxLayout()
+        col_beam.setSpacing(4)
+        col_beam.setContentsMargins(0, 0, 0, 0)
         col_beam.addWidget(_field_label("Beam Size"))
         self.beam_spin = QSpinBox()
         self.beam_spin.setRange(1, 10)
         self.beam_spin.setValue(self.state.beam_size)
         self.beam_spin.setStyleSheet(LINEEDIT_STYLE)
         col_beam.addWidget(self.beam_spin)
-        row1.addLayout(col_beam)
+        row1.addLayout(col_beam, 1)
 
         col_bestof = QVBoxLayout()
+        col_bestof.setSpacing(4)
+        col_bestof.setContentsMargins(0, 0, 0, 0)
         col_bestof.addWidget(_field_label("Best Of"))
         self.bestof_spin = QSpinBox()
         self.bestof_spin.setRange(1, 10)
         self.bestof_spin.setValue(self.state.best_of)
         self.bestof_spin.setStyleSheet(LINEEDIT_STYLE)
         col_bestof.addWidget(self.bestof_spin)
-        row1.addLayout(col_bestof)
+        row1.addLayout(col_bestof, 1)
 
         col_temp = QVBoxLayout()
+        col_temp.setSpacing(4)
+        col_temp.setContentsMargins(0, 0, 0, 0)
         col_temp.addWidget(_field_label("Temperature"))
         self.temp_spin = QDoubleSpinBox()
         self.temp_spin.setRange(0.0, 1.0)
@@ -296,11 +312,13 @@ class DashboardPage(QWidget):
         self.temp_spin.setValue(self.state.temperature)
         self.temp_spin.setStyleSheet(LINEEDIT_STYLE)
         col_temp.addWidget(self.temp_spin)
-        row1.addLayout(col_temp)
+        row1.addLayout(col_temp, 1)
         body.addLayout(row1)
 
         row2 = QHBoxLayout()
         col_words = QVBoxLayout()
+        col_words.setSpacing(4)
+        col_words.setContentsMargins(0, 0, 0, 0)
         col_words.addWidget(_field_label("Words / Subtitle"))
         self.max_words_spin = QSpinBox()
         self.max_words_spin.setRange(1, 12)
@@ -310,16 +328,19 @@ class DashboardPage(QWidget):
         row2.addLayout(col_words, 1)
         body.addLayout(row2)
 
+
         tog_row = QHBoxLayout()
+        tog_row.setSpacing(16)
         self.cond_prev_check = QCheckBox("Condition On Previous Text")
-        self.cond_prev_check.setStyleSheet(f"color: {TEXT_SUB};")
+        self.cond_prev_check.setStyleSheet(CHECKBOX_STYLE)
         tog_row.addWidget(self.cond_prev_check)
         self.word_ts_check = QCheckBox("Word Timestamps")
         self.word_ts_check.setChecked(self.state.word_timestamps)
-        self.word_ts_check.setStyleSheet(f"color: {TEXT_SUB};")
+        self.word_ts_check.setStyleSheet(CHECKBOX_STYLE)
         tog_row.addWidget(self.word_ts_check)
         tog_row.addStretch(1)
         body.addLayout(tog_row)
+
 
         return card
 
@@ -377,10 +398,10 @@ class DashboardPage(QWidget):
         clear_btn.setStyleSheet(BTN_SECONDARY_STYLE)
         clear_btn.clicked.connect(self._clear_telemetry)
         hdr.addWidget(clear_btn)
-        live_lbl = QLabel("● Live")
-        live_lbl.setStyleSheet(f"color: {SUCCESS}; font-size: 11px; font-weight: 700; border: none;")
-        hdr.addWidget(live_lbl)
+        self.live_indicator = LiveStatusIndicator()
+        hdr.addWidget(self.live_indicator)
         body.addLayout(hdr)
+
 
         tiles_row = QHBoxLayout()
         tiles_row.setSpacing(8)
@@ -412,7 +433,10 @@ class DashboardPage(QWidget):
         return card
 
     def _clear_telemetry(self):
+        if hasattr(self, "live_indicator"):
+            self.live_indicator.set_live(False)
         self.tile_progress.setText("0%")
+
         self.tile_processed.setText("00:00:00")
         self.tile_remaining.setText("00:00:00")
         self.tile_speed.setText("0.0x")
@@ -617,6 +641,8 @@ class DashboardPage(QWidget):
         self.gen_btn.setEnabled(False)
         self.gen_btn.setText("  Transcribing…")
         self._clear_telemetry()
+        if hasattr(self, "live_indicator"):
+            self.live_indicator.set_live(True)
         self.main_window.set_busy(True)
 
         self.worker = TranscribeWorker(
@@ -675,6 +701,8 @@ class DashboardPage(QWidget):
     @Slot(str, list)
     def _on_finished(self, out_path: str, segs: list):
         self.main_window.set_busy(False)
+        if hasattr(self, "live_indicator"):
+            self.live_indicator.set_live(False)
         self._last_out_path = out_path
         self.all_segs = segs
         self.progress_bar.setValue(100)
@@ -707,6 +735,8 @@ class DashboardPage(QWidget):
     @Slot(str)
     def _on_error(self, msg: str):
         self.main_window.set_busy(False)
+        if hasattr(self, "live_indicator"):
+            self.live_indicator.set_live(False)
         self.progress_bar.setValue(0)
         self.status_lbl.setText(f"Error: {msg[:80]}")
         self.status_lbl.setStyleSheet(f"color: {ERROR_C}; font-size: 12px; border: none;")

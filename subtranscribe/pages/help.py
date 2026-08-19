@@ -1,9 +1,10 @@
-"""Help & documentation. Qt port of SubGenApp._render_help (subgen.py:2644-2677)."""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPlainTextEdit, QScrollArea
 
 from ..config import DARK_BG
 from ..widgets.cards import make_card
-from ..widgets.styles import TEXTEDIT_STYLE
+from ..widgets.styles import TEXTEDIT_STYLE, SCROLLBAR_STYLE
+
 
 _HELP_TEXT = """SubTranscribe User Guide & FAQ
 
@@ -32,8 +33,10 @@ class HelpPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 

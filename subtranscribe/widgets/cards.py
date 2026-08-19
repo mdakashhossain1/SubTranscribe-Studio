@@ -11,16 +11,22 @@ def make_card(title: str, icon_name: str | None = None) -> tuple[QFrame, QVBoxLa
     icon_name, if given, is a Bootstrap Icons name shown left of the title —
     Qt port of _card's optional icon_name param (subgen.py:2813-2827)."""
     card = QFrame()
+    card.setObjectName("cardFrame")
     card.setStyleSheet(f"""
-        QFrame {{
+        #cardFrame {{
             background-color: {CARD_BG};
             border: 1px solid {BORDER_COLOR};
             border-radius: 10px;
+        }}
+        QLabel {{
+            border: none;
+            background: transparent;
         }}
     """)
     outer = QVBoxLayout(card)
     outer.setContentsMargins(16, 14, 16, 16)
     outer.setSpacing(10)
+
 
     if title:
         hdr = QHBoxLayout()
@@ -59,3 +65,39 @@ def make_stat_tile(label: str, value: str = "0", color: str = TEXT_MAIN) -> tupl
     v.addWidget(val_lbl)
 
     return tile, val_lbl
+
+
+class LiveStatusIndicator(QLabel):
+    """Pulsing status badge: displays '● Offline' when idle, and an animated pulsing '● Live' when active."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._is_live = False
+        self._pulse_state = False
+        from PySide6.QtCore import QTimer
+        self._timer = QTimer(self)
+        self._timer.setInterval(500)
+        self._timer.timeout.connect(self._on_pulse)
+        self._update_appearance()
+
+    def set_live(self, live: bool):
+        self._is_live = bool(live)
+        if self._is_live:
+            self._pulse_state = False
+            self._timer.start()
+        else:
+            self._timer.stop()
+        self._update_appearance()
+
+    def _on_pulse(self):
+        self._pulse_state = not self._pulse_state
+        self._update_appearance()
+
+    def _update_appearance(self):
+        from ..config import SUCCESS, TEXT_SUB
+        if self._is_live:
+            dot_color = SUCCESS if not self._pulse_state else "#6EE7B7"
+            self.setText(f'<span style="color: {dot_color}; font-size: 13px;">●</span> <span style="color: {SUCCESS}; font-weight: 700;">Live</span>')
+        else:
+            self.setText(f'<span style="color: {TEXT_SUB}; font-size: 13px;">●</span> <span style="color: {TEXT_SUB}; font-weight: 600;">Offline</span>')
+        self.setStyleSheet("border: none; background: transparent; font-size: 11px;")
+

@@ -3,6 +3,7 @@ SubGenApp._render_telemetry_page (subgen.py:2543-2591), fed by the
 shared TelemetryWorker (main_window.telemetry_worker) instead of a
 per-tick root.after(0, ...) callback.
 """
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea
 
 from ..backend.device import GPU_NAME, DEVICE
@@ -12,6 +13,7 @@ from ..config import DARK_BG, INPUT_BG, BORDER_COLOR, TEXT_MAIN, TEXT_SUB, ACCEN
 from ..icons import get_bs_icon
 from ..paths import FFMPEG_PATH
 from ..widgets.cards import make_card
+from ..widgets.styles import SCROLLBAR_STYLE
 
 
 class TelemetryPage(QWidget):
@@ -21,8 +23,10 @@ class TelemetryPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 

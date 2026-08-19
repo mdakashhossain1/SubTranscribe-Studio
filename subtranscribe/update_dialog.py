@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from .backend.update import clean_release_notes
 from .config import APP_VER, DARK_BG, PANEL_BG, BORDER_COLOR, TEXT_MAIN, TEXT_SUB, ACCENT_CYAN, SUCCESS
 from .icons import get_bs_icon
-from .widgets.styles import BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE, PROGRESSBAR_STYLE, TEXTEDIT_STYLE
+from .widgets.styles import BTN_PRIMARY_STYLE, BTN_SECONDARY_STYLE, PROGRESSBAR_STYLE, TEXTEDIT_STYLE, enable_dark_titlebar
 from .workers import UpdateDownloadWorker
 
 
@@ -23,6 +23,8 @@ class UpdateDialog(QDialog):
         self.setWindowTitle("Update Available")
         self.setFixedSize(560, 540)
         self.setStyleSheet(f"background-color: {DARK_BG};")
+        enable_dark_titlebar(self)
+
 
         self.latest = latest
         self.url = url

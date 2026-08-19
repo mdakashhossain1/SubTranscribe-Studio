@@ -16,8 +16,9 @@ from ..config import (
 )
 from ..icons import get_bs_icon
 from ..widgets.cards import make_card
-from ..widgets.styles import BTN_PRIMARY_STYLE, BTN_DANGER_STYLE, PROGRESSBAR_STYLE
+from ..widgets.styles import BTN_PRIMARY_STYLE, BTN_DANGER_STYLE, PROGRESSBAR_STYLE, SCROLLBAR_STYLE
 from ..workers import DownloadWorker
+
 
 # (tag, description) per model — same copy as subgen.py:2220-2229; size/VRAM
 # strings are derived live from config.MODEL_SIZES_MB/MODEL_VRAM_MB below
@@ -43,8 +44,10 @@ class ModelsPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 

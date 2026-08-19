@@ -14,8 +14,9 @@ from ..config import APP_NAME, APP_VER, LOGO_PATH, DARK_BG, CARD_BG, INPUT_BG, B
 from ..icons import get_bs_icon
 from ..paths import FFMPEG_PATH
 from ..widgets.cards import make_card
-from ..widgets.styles import BTN_SECONDARY_STYLE
+from ..widgets.styles import BTN_SECONDARY_STYLE, SCROLLBAR_STYLE
 from ..workers import UpdateCheckWorker
+
 
 _FEATURES = [
     ("cpu-fill", "Faster-Whisper & CTranslate2 Engine",
@@ -42,8 +43,10 @@ class AboutPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 

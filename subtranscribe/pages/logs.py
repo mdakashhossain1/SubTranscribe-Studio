@@ -2,6 +2,7 @@
 _copy_logs/_clear_logs (subgen.py:2592-2642)."""
 import time
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QPlainTextEdit, QApplication, QScrollArea
 
 from ..backend.device import GPU_NAME, DEVICE, COMPUTE_TYPE
@@ -10,7 +11,7 @@ from ..config import APP_VER, DARK_BG
 from ..icons import get_bs_icon
 from ..paths import FFMPEG_PATH
 from ..widgets.cards import make_card
-from ..widgets.styles import BTN_SECONDARY_STYLE, BTN_DANGER_STYLE, TEXTEDIT_STYLE
+from ..widgets.styles import BTN_SECONDARY_STYLE, BTN_DANGER_STYLE, TEXTEDIT_STYLE, SCROLLBAR_STYLE
 
 
 class LogsPage(QWidget):
@@ -20,8 +21,10 @@ class LogsPage(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {DARK_BG}; }} {SCROLLBAR_STYLE}")
         outer = QVBoxLayout(self)
+
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 

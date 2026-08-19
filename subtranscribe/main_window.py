@@ -7,11 +7,12 @@ QStackedWidget instead of pack/pack_forget.
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtCore import Qt, QTimer, QSize, QObject, QEvent
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QPushButton, QStackedWidget, QButtonGroup, QSizePolicy, QFrame,
+    QApplication, QComboBox, QAbstractSpinBox, QSlider, QScrollArea,
 )
 
 from .backend.device import DEVICE_LABEL, DEVICE_COLOR
@@ -20,7 +21,26 @@ from .config import APP_NAME, APP_VER, LOGO_PATH, ICON_PATH, DARK_BG, PANEL_BG, 
 from .icons import get_bs_icon
 from .paths import FFMPEG_PATH
 from .state import AppState
+from .widgets.styles import DIALOG_STYLE
 from .workers import TelemetryWorker, UpdateCheckWorker
+
+
+class ScrollWheelFilter(QObject):
+    """Event filter that prevents mouse wheel from inadvertently changing values
+    on QComboBox, QAbstractSpinBox, and QSlider widgets while scrolling through pages."""
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Wheel:
+            if isinstance(obj, (QComboBox, QAbstractSpinBox, QSlider)):
+                parent = obj.parentWidget()
+                while parent:
+                    if isinstance(parent, QScrollArea):
+                        QApplication.sendEvent(parent.viewport(), event)
+                        return True
+                    parent = parent.parentWidget()
+                event.ignore()
+                return True
+        return super().eventFilter(obj, event)
 
 # (label, page_name, bootstrap-icon-name) — icon choices match subgen.py's
 # nav_items (subgen.py:1828-1837, 1873-1874).
@@ -47,6 +67,19 @@ class MainWindow(QMainWindow):
         self.resize(1280, 800)
         if ICON_PATH.exists():
             self.setWindowIcon(QIcon(str(ICON_PATH)))
+
+        from .widgets.dialogs import patch_qmessagebox
+        from .widgets.styles import enable_dark_titlebar
+        patch_qmessagebox()
+        enable_dark_titlebar(self)
+
+        app = QApplication.instance()
+        if app is not None:
+
+            self._wheel_filter = ScrollWheelFilter(self)
+            app.installEventFilter(self._wheel_filter)
+            app.setStyleSheet(DIALOG_STYLE)
+
 
         self._page_cache: dict[str, QWidget] = {}
         self._page_builders: dict[str, callable] = {}
@@ -234,7 +267,7 @@ class MainWindow(QMainWindow):
             status_icon_lbl.setStyleSheet("border: none; background: transparent;")
             status_row.addWidget(status_icon_lbl)
         status_lbl = QLabel("All Systems Operational")
-        status_lbl.setStyleSheet(f"color: {SUCCESS}; font-size: 11px; font-weight: 700; border: none; background: transparent;")
+        status_lbl.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 11px; font-weight: 700; border: none; background: transparent;")
         status_row.addWidget(status_lbl)
         status_row.addStretch(1)
         layout.addSpacing(8)
@@ -296,7 +329,7 @@ class MainWindow(QMainWindow):
             icon_lbl.setStyleSheet("border: none;")
             layout.addWidget(icon_lbl)
         status_lbl = QLabel("System Status:  All Systems Operational")
-        status_lbl.setStyleSheet(f"color: {SUCCESS}; font-size: 11px; font-weight: 700;")
+        status_lbl.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 11px; font-weight: 700;")
         layout.addWidget(status_lbl)
         layout.addStretch(1)
 
@@ -386,6 +419,11 @@ class MainWindow(QMainWindow):
             self.stack.removeWidget(page)
             page.deleteLater()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        from .widgets.styles import enable_dark_titlebar
+        enable_dark_titlebar(self)
+
     def _placeholder_page(self, main_window, page_name: str) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -394,3 +432,4 @@ class MainWindow(QMainWindow):
         lbl.setStyleSheet(f"color: {TEXT_SUB}; font-size: 16px;")
         layout.addWidget(lbl)
         return page
+
