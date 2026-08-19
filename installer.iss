@@ -1,7 +1,7 @@
 ; Script generated for SubTranscribe Studio Enterprise Edition
 #define MyAppName "SubTranscribe Studio"
 ; Version is read directly from the VERSION file at the project root — the
-; single source of truth also read by subgen.py at runtime. CI overwrites
+; single source of truth also read by main.py at runtime. CI overwrites
 ; that file from the git tag before compiling (see build-desktop.yml).
 ; Read via ISPP's FileOpen/FileRead rather than GetEnv("APP_VERSION"): the
 ; env-var approach silently produced a broken build in CI (the compile step
@@ -26,7 +26,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=dist
 OutputBaseFilename=SubTranscribe_Studio_Setup_v{#MyAppVersion}
-SetupIconFile=assets\logo.ico
+SetupIconFile=subtranscribe\assets\logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
 SolidCompression=yes
@@ -51,7 +51,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 [Code]
 // Downloaded models and history.json live in the per-user AppData folder
 // (not {app}\models under Program Files) since a standard user can't write
-// there — see DATA_DIR in subgen.py. A normal install/upgrade only ever
+// there — see DATA_DIR in main.py. A normal install/upgrade only ever
 // writes under {app} (via [Files] above), so re-running this installer to
 // update to a new version never touches this folder — models and history
 // always survive an update untouched.

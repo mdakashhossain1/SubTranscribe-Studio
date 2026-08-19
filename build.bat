@@ -5,13 +5,13 @@ echo  SubTranscribe Studio - Building Windows Executable ^& Setup
 echo ============================================
 echo.
 
-set VENV=%~dp0.venv
+set VENV=%~dp0subtranscribe\.venv
 set PIP=%VENV%\Scripts\pip.exe
 set PYTHON=%VENV%\Scripts\python.exe
 set PYINSTALLER=%VENV%\Scripts\pyinstaller.exe
 
 :: Version comes from the VERSION file (single source of truth — see
-:: subgen.py's _load_app_version() and installer.iss's MyAppVersion, which
+:: main.py's _load_app_version() and installer.iss's MyAppVersion, which
 :: reads this same file directly).
 set VER=dev
 if exist "%~dp0VERSION" set /p VER=<"%~dp0VERSION"
@@ -23,7 +23,7 @@ if not exist "%PYINSTALLER%" (
 )
 
 :: Ensure logo.ico is generated from logo.png
-"%PYTHON%" -c "from PIL import Image; img=Image.open('assets/logo.png'); img.save('assets/logo.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])" 2>nul
+"%PYTHON%" -c "from PIL import Image; img=Image.open('subtranscribe/assets/logo.png'); img.save('subtranscribe/assets/logo.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])" 2>nul
 
 :: Clean previous build
 if exist "%~dp0dist" (
@@ -42,23 +42,19 @@ echo.
     --name "SubTranscribeStudio" ^
     --windowed ^
     --onedir ^
-    --icon "%~dp0assets\logo.ico" ^
-    --collect-all customtkinter ^
+    --icon "%~dp0subtranscribe\assets\logo.ico" ^
+    --collect-all PySide6 ^
     --collect-all faster_whisper ^
     --collect-all ctranslate2 ^
     --collect-all deep_translator ^
     --collect-all tiktoken ^
     --collect-all tokenizers ^
     --collect-all sounddevice ^
-    --collect-all pymupdf ^
-    --hidden-import tkinter ^
-    --hidden-import tkinter.filedialog ^
-    --hidden-import tkinter.messagebox ^
     --hidden-import faster_whisper ^
     --hidden-import ctranslate2 ^
     --clean ^
     --noconfirm ^
-    "%~dp0subgen.py"
+    "%~dp0main.py"
 
 if %errorlevel% neq 0 (
     echo.
@@ -72,11 +68,10 @@ if %errorlevel% neq 0 (
 :: Copy required runtime directories to dist\SubTranscribeStudio
 :: (models are NOT bundled here - they're downloaded on demand into the
 :: per-user AppData folder at runtime, since Program Files isn't writable
-:: by standard users - see DATA_DIR in subgen.py)
+:: by standard users - see DATA_DIR in main.py)
 echo Copying assets and binaries...
-xcopy /E /I /Y "%~dp0assets" "%~dp0dist\SubTranscribeStudio\assets" >nul 2>&1
+xcopy /E /I /Y "%~dp0subtranscribe\assets" "%~dp0dist\SubTranscribeStudio\assets" >nul 2>&1
 if exist "%~dp0bin" xcopy /E /I /Y "%~dp0bin" "%~dp0dist\SubTranscribeStudio\bin" >nul 2>&1
-if exist "%~dp0whisper.cpp" xcopy /E /I /Y "%~dp0whisper.cpp" "%~dp0dist\SubTranscribeStudio\whisper.cpp" >nul 2>&1
 copy /Y "%~dp0VERSION" "%~dp0dist\SubTranscribeStudio\VERSION" >nul 2>&1
 
 :: Create Desktop Shortcut helper VBScript in dist\SubTranscribeStudio

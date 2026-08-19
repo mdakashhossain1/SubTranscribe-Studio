@@ -34,12 +34,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r subtranscribe/requirements.txt
           pip install pyinstaller
 
       - name: Generate app icon from logo.png
         run: |
-          python -c "from PIL import Image; img = Image.open('assets/logo.png'); img.save('assets/logo.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+          python -c "from PIL import Image; img = Image.open('subtranscribe/assets/logo.png'); img.save('subtranscribe/assets/logo.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
 
       - name: Build with PyInstaller
         run: >
@@ -47,28 +47,27 @@ jobs:
           --name "SubTranscribeStudio"
           --windowed
           --onedir
-          --icon "assets/logo.ico"
-          --collect-all customtkinter
+          --icon "subtranscribe/assets/logo.ico"
+          --collect-all PySide6
           --collect-all faster_whisper
           --collect-all ctranslate2
           --collect-all deep_translator
           --collect-all tiktoken
           --collect-all tokenizers
           --collect-all sounddevice
-          --collect-all pymupdf
-          --hidden-import tkinter
-          --hidden-import tkinter.filedialog
-          --hidden-import tkinter.messagebox
           --hidden-import faster_whisper
           --hidden-import ctranslate2
           --clean
           --noconfirm
-          subgen.py
+          main.py
 
       - name: Bundle runtime assets
         shell: pwsh
         run: |
-          Copy-Item -Recurse -Force assets dist/SubTranscribeStudio/assets
+          # assets/ lives inside subtranscribe/ in the repo (colocated with the
+          # code that uses it) but ships flat as dist/SubTranscribeStudio/assets,
+          # matching what installer.iss's {app}\assets\... references expect.
+          Copy-Item -Recurse -Force subtranscribe/assets dist/SubTranscribeStudio/assets
           if (Test-Path bin) { Copy-Item -Recurse -Force bin dist/SubTranscribeStudio/bin }
           Copy-Item -Force VERSION dist/SubTranscribeStudio/VERSION
 
@@ -122,12 +121,14 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk portaudio19-dev libasound2-dev libx11-dev ffmpeg
+          sudo apt-get install -y portaudio19-dev libasound2-dev libx11-dev ffmpeg \
+            libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libegl1 libgl1
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r subtranscribe/requirements.txt
           pip install pyinstaller
 
       - name: Build Linux Binary with PyInstaller
@@ -135,22 +136,20 @@ jobs:
           pyinstaller \
             --name "SubTranscribeStudio" \
             --onedir \
-            --collect-all customtkinter \
+            --collect-all PySide6 \
             --collect-all faster_whisper \
             --collect-all ctranslate2 \
             --collect-all deep_translator \
             --collect-all tiktoken \
             --collect-all tokenizers \
             --collect-all sounddevice \
-            --collect-all pymupdf \
-            --hidden-import tkinter \
             --clean \
             --noconfirm \
-            subgen.py
+            main.py
 
       - name: Bundle Linux runtime assets & Compress
         run: |
-          cp -r assets dist/SubTranscribeStudio/assets
+          cp -r subtranscribe/assets dist/SubTranscribeStudio/assets
           if [ -d "bin" ]; then cp -r bin dist/SubTranscribeStudio/bin; fi
           cp VERSION dist/SubTranscribeStudio/VERSION
           tar -czvf SubTranscribe-Studio-Linux-x86_64.tar.gz -C dist/SubTranscribeStudio .
@@ -184,7 +183,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r subtranscribe/requirements.txt
           pip install pyinstaller
 
       - name: Build macOS App Bundle with PyInstaller
@@ -193,22 +192,20 @@ jobs:
             --name "SubTranscribeStudio" \
             --windowed \
             --onedir \
-            --collect-all customtkinter \
+            --collect-all PySide6 \
             --collect-all faster_whisper \
             --collect-all ctranslate2 \
             --collect-all deep_translator \
             --collect-all tiktoken \
             --collect-all tokenizers \
             --collect-all sounddevice \
-            --collect-all pymupdf \
-            --hidden-import tkinter \
             --clean \
             --noconfirm \
-            subgen.py
+            main.py
 
       - name: Bundle macOS runtime assets & Zip
         run: |
-          cp -r assets dist/SubTranscribeStudio/assets
+          cp -r subtranscribe/assets dist/SubTranscribeStudio/assets
           if [ -d "bin" ]; then cp -r bin dist/SubTranscribeStudio/bin; fi
           cp VERSION dist/SubTranscribeStudio/VERSION
           cd dist && zip -r ../SubTranscribe-Studio-macOS-universal.zip SubTranscribeStudio
@@ -242,12 +239,14 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk portaudio19-dev libasound2-dev libx11-dev ffmpeg
+          sudo apt-get install -y portaudio19-dev libasound2-dev libx11-dev ffmpeg \
+            libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libegl1 libgl1
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r subtranscribe/requirements.txt
           pip install pyinstaller
 
       - name: Build ARM64 Binary with PyInstaller
@@ -255,22 +254,20 @@ jobs:
           pyinstaller \
             --name "SubTranscribeStudio" \
             --onedir \
-            --collect-all customtkinter \
+            --collect-all PySide6 \
             --collect-all faster_whisper \
             --collect-all ctranslate2 \
             --collect-all deep_translator \
             --collect-all tiktoken \
             --collect-all tokenizers \
             --collect-all sounddevice \
-            --collect-all pymupdf \
-            --hidden-import tkinter \
             --clean \
             --noconfirm \
-            subgen.py
+            main.py
 
       - name: Bundle Raspberry Pi runtime assets & Compress
         run: |
-          cp -r assets dist/SubTranscribeStudio/assets
+          cp -r subtranscribe/assets dist/SubTranscribeStudio/assets
           if [ -d "bin" ]; then cp -r bin dist/SubTranscribeStudio/bin; fi
           cp VERSION dist/SubTranscribeStudio/VERSION
           tar -czvf SubTranscribe-Studio-RaspberryPi-arm64.tar.gz -C dist/SubTranscribeStudio .

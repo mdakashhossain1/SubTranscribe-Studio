@@ -21,24 +21,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcb-render-util0 \
     libxcb-shape0 \
     libx11-xcb1 \
-    python3-tk \
-    tk-dev \
-    tcl-dev \
+    libegl1 \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
+# Copy just requirements.txt first (it lives inside subtranscribe/, colocated
+# with the code that needs it) so this layer only rebuilds when deps change,
+# not on every source edit.
+COPY subtranscribe/requirements.txt subtranscribe/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r subtranscribe/requirements.txt
 
-# Copy application files
-COPY subgen.py .
-COPY assets/ assets/
+# Copy application files (assets/ lives inside subtranscribe/ too, so it
+# comes along with that copy — no separate assets/ line needed)
+COPY main.py .
+COPY subtranscribe/ subtranscribe/
+COPY VERSION .
 COPY bin/ bin/
 
 # Default entry point for SubTranscribe Studio
-CMD ["python", "subgen.py"]
+CMD ["python", "main.py"]

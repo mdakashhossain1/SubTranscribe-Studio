@@ -1,7 +1,6 @@
 ﻿faster-whisper
-customtkinter
+PySide6
 deep-translator
 sounddevice
 Pillow
-PyMuPDF
 psutil

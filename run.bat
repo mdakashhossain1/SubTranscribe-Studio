@@ -1,7 +1,7 @@
 @echo off
 
 :: If local venv doesn't exist, set it up automatically
-if not exist "%~dp0.venv\Scripts\python.exe" (
+if not exist "%~dp0subtranscribe\.venv\Scripts\python.exe" (
     echo Setting up SubTranscribe for first-time use...
     echo.
 
@@ -14,7 +14,7 @@ if not exist "%~dp0.venv\Scripts\python.exe" (
     )
 
     echo Creating local virtual environment...
-    python -m venv "%~dp0.venv"
+    python -m venv "%~dp0subtranscribe\.venv"
     if %errorlevel% neq 0 (
         echo ERROR: Failed to create virtual environment.
         pause
@@ -22,10 +22,10 @@ if not exist "%~dp0.venv\Scripts\python.exe" (
     )
 
     echo Installing required packages (this may take a few minutes^)...
-    "%~dp0.venv\Scripts\pip.exe" install -r "%~dp0requirements.txt" --quiet
+    "%~dp0subtranscribe\.venv\Scripts\pip.exe" install -r "%~dp0subtranscribe\requirements.txt" --quiet
     echo.
     echo Setup complete! Launching SubTranscribe...
 )
 
 :: Launch app (detached — no lingering CMD window)
-start "" "%~dp0.venv\Scripts\pythonw.exe" "%~dp0subgen.py"
+start "" "%~dp0subtranscribe\.venv\Scripts\pythonw.exe" "%~dp0main.py"
