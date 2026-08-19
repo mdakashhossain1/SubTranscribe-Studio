@@ -166,7 +166,17 @@ def build_progress_tracker(model_size: str):
     SubGenApp._download_thread's two `get_progress` closures (verbatim glob
     logic), just parameterized instead of capturing `model_size` from an
     enclosing scope.
+
+    The `.incomplete`/`.tmp` staging-file matches below are additionally
+    gated on mtime >= session_start. Without that, a *stale* leftover temp
+    file from an earlier interrupted/crashed download (any model — the
+    extension match alone doesn't know which model a staging file belongs
+    to) gets permanently counted into every future download's progress
+    total, making the bar jump to a false "100%" almost immediately while
+    the real download is still running underneath it.
     """
+    session_start = time.time()
+
     if USE_WHISPERCPP:
         repo, filename = GGML_MODEL_FILES.get(model_size, (None, None))
         approx_bytes = GGML_MODEL_SIZES_MB.get(model_size, 500) * 1024 * 1024
@@ -183,8 +193,11 @@ def build_progress_tracker(model_size: str):
             if GGML_MODELS_DIR.exists():
                 for f in GGML_MODELS_DIR.rglob("*"):
                     if f.is_file() and not f.is_symlink() and f != target_file:
-                        if filename and (filename in f.name or f.name.endswith(".incomplete") or f.name.endswith(".tmp")):
+                        is_staging = f.name.endswith(".incomplete") or f.name.endswith(".tmp")
+                        if filename and (filename in f.name or is_staging):
                             try:
+                                if is_staging and f.stat().st_mtime < session_start:
+                                    continue  # stale leftover from an earlier session — not this download
                                 tot += f.stat().st_size
                             except Exception:
                                 pass
@@ -192,8 +205,11 @@ def build_progress_tracker(model_size: str):
             if dl_dir.exists():
                 for f in dl_dir.rglob("*"):
                     if f.is_file() and not f.is_symlink():
-                        if filename and (filename in f.name or f.name.endswith(".incomplete")):
+                        is_staging = f.name.endswith(".incomplete")
+                        if filename and (filename in f.name or is_staging):
                             try:
+                                if is_staging and f.stat().st_mtime < session_start:
+                                    continue
                                 tot += f.stat().st_size
                             except Exception:
                                 pass
@@ -227,7 +243,10 @@ def build_progress_tracker(model_size: str):
             if dl_dir.exists():
                 for f in dl_dir.rglob("*"):
                     if f.is_file() and not f.is_symlink():
+                        is_staging = f.name.endswith(".incomplete") or f.name.endswith(".tmp")
                         try:
+                            if is_staging and f.stat().st_mtime < session_start:
+                                continue
                             tot += f.stat().st_size
                         except Exception:
                             pass

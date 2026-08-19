@@ -362,20 +362,23 @@ class DashboardPage(QWidget):
     # ── Generate button ──────────────────────────────────────────────
     def _build_generate_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
+        row.setSpacing(12)
+
         browse_btn = QPushButton("  Select Media File")
         browse_btn.setIcon(get_bs_icon("folder2-open", color="#FFFFFF", size=16))
         browse_btn.setStyleSheet(BTN_SECONDARY_STYLE)
-        browse_btn.setMinimumHeight(44)
+        browse_btn.setFixedHeight(44)
         browse_btn.clicked.connect(self._browse_file)
-        row.addWidget(browse_btn)
+        row.addWidget(browse_btn, 1)
 
         self.gen_btn = QPushButton("  Generate Subtitles")
-        self.gen_btn.setIcon(get_bs_icon("play-fill", color="#FFFFFF", size=18))
+        self.gen_btn.setIcon(get_bs_icon("play-fill", color="#FFFFFF", size=16))
         self.gen_btn.setStyleSheet(BTN_PRIMARY_STYLE)
-        self.gen_btn.setMinimumHeight(44)
+        self.gen_btn.setFixedHeight(44)
         self.gen_btn.clicked.connect(self._on_generate_clicked)
         row.addWidget(self.gen_btn, 1)
         return row
+
 
     def _browse_file(self):
         path, _ = QFileDialog.getOpenFileName(
