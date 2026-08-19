@@ -62,17 +62,94 @@ var
 function InitializeUninstall(): Boolean;
 var
   DataDir: String;
+  UninstallForm: TSetupForm;
+  InfoLabel: TNewStaticText;
+  CleanCheckBox: TNewCheckBox;
+  ButtonsDivider: TBevel;
+  BtnUninstall, BtnCancel: TNewButton;
+  HasDataDir: Boolean;
+  FormHeight: Integer;
 begin
-  Result := True;
+  Result := False;
   CleanUninstall := False;
   DataDir := ExpandConstant('{localappdata}\SubTranscribe Studio');
+  HasDataDir := DirExists(DataDir);
 
-  if DirExists(DataDir) then
-  begin
-    // Crystal-clear single prompt:
-    // Yes = Completely delete all downloaded AI models and history (Clean wipe)
-    // No  = Keep models and history for future use (Default uninstall)
-    CleanUninstall := (MsgBox('Do you also want to completely delete all downloaded AI models and data?' + #13#10#13#10 + '• Click YES to remove all downloaded models, cache, and history.' + #13#10 + '• Click NO to keep your downloaded models for future use.', mbConfirmation, MB_YESNO) = idYes);
+  // Single wizard-styled confirmation dialog (built from the same native
+  // controls the install wizard uses) instead of two chained native
+  // MsgBox() popups — one checkbox covers the cleanup choice.
+  UninstallForm := CreateCustomForm();
+  try
+    FormHeight := 170;
+    if HasDataDir then
+      FormHeight := FormHeight + 34;
+
+    UninstallForm.ClientWidth := ScaleX(420);
+    UninstallForm.ClientHeight := ScaleY(FormHeight);
+    UninstallForm.Caption := 'Uninstall SubTranscribe Studio';
+    UninstallForm.Position := poScreenCenter;
+    UninstallForm.BorderStyle := bsDialog;
+
+    InfoLabel := TNewStaticText.Create(UninstallForm);
+    InfoLabel.Parent := UninstallForm;
+    InfoLabel.Left := ScaleX(20);
+    InfoLabel.Top := ScaleY(20);
+    InfoLabel.Width := UninstallForm.ClientWidth - ScaleX(40);
+    InfoLabel.AutoSize := False;
+    InfoLabel.Height := ScaleY(48);
+    InfoLabel.WordWrap := True;
+    InfoLabel.Caption := 'Are you sure you want to completely remove SubTranscribe Studio and all of its components from this computer?';
+
+    if HasDataDir then
+    begin
+      CleanCheckBox := TNewCheckBox.Create(UninstallForm);
+      CleanCheckBox.Parent := UninstallForm;
+      CleanCheckBox.Left := ScaleX(20);
+      CleanCheckBox.Top := InfoLabel.Top + InfoLabel.Height + ScaleY(8);
+      CleanCheckBox.Width := UninstallForm.ClientWidth - ScaleX(40);
+      CleanCheckBox.Height := ScaleY(34);
+      CleanCheckBox.Caption := 'Also delete downloaded AI models, cache, and history' + #13#10 + '(complete cleanup — leaves zero traces on this PC)';
+      CleanCheckBox.Checked := False;
+    end
+    else
+      CleanCheckBox := nil;
+
+    ButtonsDivider := TBevel.Create(UninstallForm);
+    ButtonsDivider.Parent := UninstallForm;
+    ButtonsDivider.Left := 0;
+    ButtonsDivider.Top := UninstallForm.ClientHeight - ScaleY(52);
+    ButtonsDivider.Width := UninstallForm.ClientWidth;
+    ButtonsDivider.Height := 1;
+    ButtonsDivider.Shape := bsTopLine;
+
+    BtnCancel := TNewButton.Create(UninstallForm);
+    BtnCancel.Parent := UninstallForm;
+    BtnCancel.Width := ScaleX(90);
+    BtnCancel.Height := ScaleY(28);
+    BtnCancel.Left := UninstallForm.ClientWidth - ScaleX(20) - BtnCancel.Width;
+    BtnCancel.Top := UninstallForm.ClientHeight - ScaleY(38);
+    BtnCancel.Caption := 'Cancel';
+    BtnCancel.Cancel := True;
+    BtnCancel.ModalResult := mrCancel;
+
+    BtnUninstall := TNewButton.Create(UninstallForm);
+    BtnUninstall.Parent := UninstallForm;
+    BtnUninstall.Width := ScaleX(100);
+    BtnUninstall.Height := ScaleY(28);
+    BtnUninstall.Left := BtnCancel.Left - ScaleX(10) - BtnUninstall.Width;
+    BtnUninstall.Top := BtnCancel.Top;
+    BtnUninstall.Caption := 'Uninstall';
+    BtnUninstall.Default := True;
+    BtnUninstall.ModalResult := mrOk;
+
+    if UninstallForm.ShowModal() = mrOk then
+    begin
+      Result := True;
+      if HasDataDir then
+        CleanUninstall := CleanCheckBox.Checked;
+    end;
+  finally
+    UninstallForm.Free;
   end;
 end;
 

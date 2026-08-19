@@ -225,16 +225,23 @@ def build_progress_tracker(model_size: str):
         def get_progress():
             tot = 0
             blobs_dir = repo_dir / "blobs"
+            blob_files = []
             if blobs_dir.exists():
-                for f in blobs_dir.rglob("*"):
-                    if f.is_file() and not f.is_symlink():
-                        try:
-                            tot += f.stat().st_size
-                        except Exception:
-                            pass
+                blob_files = [f for f in blobs_dir.rglob("*") if f.is_file() and not f.is_symlink()]
+            if blob_files:
+                for f in blob_files:
+                    try:
+                        tot += f.stat().st_size
+                    except Exception:
+                        pass
             elif repo_dir.exists():
+                # Without symlink privilege (the Windows default for standard
+                # users), huggingface_hub writes real file content straight
+                # into snapshots/ instead of blobs/, leaving blobs/ empty —
+                # count everything under the repo except lock files so
+                # progress doesn't stay frozen at 0% for the whole download.
                 for f in repo_dir.rglob("*"):
-                    if f.is_file() and not f.is_symlink() and "snapshots" not in f.parts:
+                    if f.is_file() and not f.is_symlink() and ".locks" not in f.parts:
                         try:
                             tot += f.stat().st_size
                         except Exception:

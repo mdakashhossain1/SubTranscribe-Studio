@@ -291,6 +291,15 @@ class DownloadWorker(QThread):
     def run(self):
         import threading as _threading
         os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+        # Newer huggingface_hub defaults to the Xet accelerated-transfer
+        # backend for repos that support it. Xet's native downloader doesn't
+        # write the classic growing <hash>.incomplete blob file this class's
+        # disk-polling progress tracker relies on — it resolves content
+        # through its own pipeline and only produces the final file at the
+        # end, so progress reads 0 for the whole download otherwise. The
+        # classic HTTP path writes incrementally and is what get_progress()
+        # actually observes, so force it.
+        os.environ["HF_HUB_DISABLE_XET"] = "1"
         model_size = self.model_size
         get_progress, expected_bytes, repo, filename = build_progress_tracker(model_size)
         base_size = get_progress()
@@ -423,9 +432,19 @@ class UpdateDownloadWorker(QThread):
                             mb_tot = total / 1_048_576
                             self.progress.emit(pct, f"Downloading… {mb_done:.1f} / {mb_tot:.1f} MB")
 
-            self.progress.emit(1.0, "Download complete. Launching installer…")
+            self.progress.emit(1.0, "Download complete. Installing update…")
             time.sleep(1.0)
-            subprocess.Popen([tmp_path], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            # Silent flags so this runs as an in-place update instead of
+            # popping the full first-run wizard (Welcome/License/directory
+            # picker), which looked like a fresh install to the user.
+            # /CLOSEAPPLICATIONS + /RESTARTAPPLICATIONS let Inno Setup's
+            # Restart Manager close this running app (its own exe would
+            # otherwise be locked), replace the files, then relaunch it.
+            subprocess.Popen(
+                [tmp_path, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+                 "/SP-", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"],
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
             self.installerLaunched.emit()
         except Exception as exc:
             self.error.emit(f"Download failed: {exc}")
