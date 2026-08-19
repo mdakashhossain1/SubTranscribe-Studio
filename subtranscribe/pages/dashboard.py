@@ -362,29 +362,32 @@ class DashboardPage(QWidget):
     # ── Generate button ──────────────────────────────────────────────
     def _build_generate_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        browse_btn = QPushButton("  Select File & Generate")
+        browse_btn = QPushButton("  Select Media File")
         browse_btn.setIcon(get_bs_icon("folder2-open", color="#FFFFFF", size=16))
         browse_btn.setStyleSheet(BTN_SECONDARY_STYLE)
-        browse_btn.clicked.connect(self._browse_and_generate)
+        browse_btn.setMinimumHeight(44)
+        browse_btn.clicked.connect(self._browse_file)
         row.addWidget(browse_btn)
 
         self.gen_btn = QPushButton("  Generate Subtitles")
         self.gen_btn.setIcon(get_bs_icon("play-fill", color="#FFFFFF", size=18))
         self.gen_btn.setStyleSheet(BTN_PRIMARY_STYLE)
-        self.gen_btn.setMinimumHeight(40)
+        self.gen_btn.setMinimumHeight(44)
         self.gen_btn.clicked.connect(self._on_generate_clicked)
         row.addWidget(self.gen_btn, 1)
         return row
 
-    def _browse_and_generate(self):
+    def _browse_file(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Select Media File", "",
             "Media Files (*.mp4 *.mkv *.avi *.mov *.mp3 *.wav *.flac *.aac *.m4a);;All Files (*)"
         )
         if path:
             self.state.input_file = path
+            self.status_lbl.setText(f"Loaded file: {Path(path).name}")
+            self.status_lbl.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 12px; border: none;")
             self._load_waveform(path)
-            self._on_generate_clicked()
+
 
     # ── 3. Real-Time Progress & Telemetry ────────────────────────────
     def _build_telemetry_card(self) -> QWidget:

@@ -151,7 +151,8 @@ class SettingsPage(QWidget):
         # ── Card 4: Data & Maintenance ───────────────────────────────────
         maint_card, maint_body = make_card("Storage & Data Maintenance", icon_name="trash-fill")
 
-        purge_btn = QPushButton("  Purge All Models & Cache")
+        purge_btn = QPushButton("  Purge All Models && Cache")
+
         purge_ic = get_bs_icon("trash-fill", color="#EF4444", size=14)
         if purge_ic:
             purge_btn.setIcon(purge_ic)
