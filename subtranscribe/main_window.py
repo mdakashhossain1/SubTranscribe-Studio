@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (
     QApplication, QComboBox, QAbstractSpinBox, QSlider, QScrollArea,
 )
 
-from .backend.device import DEVICE_LABEL, DEVICE_COLOR
+from .backend.device import DEVICE_LABEL, DEVICE_COLOR, DEVICE, COMPUTE_TYPE, GPU_NAME
+from .backend.eventlog import log_event
 from .backend.transcribe import BACKEND
 from .config import APP_NAME, APP_VER, LOGO_PATH, ICON_PATH, DARK_BG, PANEL_BG, BORDER_COLOR, ACCENT, TEXT_MAIN, TEXT_SUB, MODEL_SIZES, WARNING, SUCCESS, INPUT_BG, ACCENT_CYAN
 from .icons import get_bs_icon
@@ -101,6 +102,13 @@ class MainWindow(QMainWindow):
         # spawning a new thread every second.
         self.telemetry_worker = TelemetryWorker(is_busy=lambda: self.is_busy)
         self.telemetry_worker.start()
+
+        log_event(f"SubTranscribe v{APP_VER} initialized cleanly.")
+        log_event(f"Backend detected: {BACKEND}")
+        log_event(f"Device compute mode: {DEVICE} ({COMPUTE_TYPE})")
+        log_event(f"GPU Name: {GPU_NAME or 'None detected'}")
+        log_event(f"FFmpeg Binary: {FFMPEG_PATH or 'Not Found'}")
+        log_event("System Status: All Systems Operational.")
 
         central = QWidget()
         self.setCentralWidget(central)

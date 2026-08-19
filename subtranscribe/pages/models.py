@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QProgressBar,
 )
 
+from ..backend.eventlog import log_event
 from ..backend.models import is_model_downloaded, delete_model_files
 from ..config import (
     MODEL_SIZES, DARK_BG, CARD_BG, BORDER_COLOR, TEXT_MAIN, TEXT_SUB,
@@ -161,6 +162,7 @@ class ModelsPage(QWidget):
         if reply != QMessageBox.Yes:
             return
         ok = delete_model_files(name)
+        log_event(f"Model deleted: {name}" if ok else f"Model delete failed: {name}")
         self.main_window.state.set_status(
             f"Model '{name}' deleted from disk." if ok else f"Could not delete model '{name}'.",
             "" if ok else "",

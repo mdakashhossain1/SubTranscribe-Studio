@@ -1,15 +1,15 @@
 """Application event log viewer. Qt port of SubGenApp._render_logs +
-_copy_logs/_clear_logs (subgen.py:2592-2642)."""
+_copy_logs/_clear_logs (subgen.py:2592-2642), now backed by the live,
+persistent backend.eventlog event stream instead of a static one-shot
+snapshot of startup diagnostics."""
 import time
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QPlainTextEdit, QApplication, QScrollArea
 
-from ..backend.device import GPU_NAME, DEVICE, COMPUTE_TYPE
-from ..backend.transcribe import BACKEND
-from ..config import APP_VER, DARK_BG
+from ..backend.eventlog import event_log, log_event
+from ..config import DARK_BG
 from ..icons import get_bs_icon
-from ..paths import FFMPEG_PATH
 from ..widgets.cards import make_card
 from ..widgets.styles import BTN_SECONDARY_STYLE, BTN_DANGER_STYLE, TEXTEDIT_STYLE, SCROLLBAR_STYLE
 
@@ -60,21 +60,20 @@ class LogsPage(QWidget):
         layout.addWidget(card)
         layout.addStretch(1)
 
-        self._write_startup_info()
+        # Render everything logged so far (startup diagnostics + any model
+        # download/transcription activity that happened before this page was
+        # ever opened), then keep appending live as new events arrive.
+        self.log_box.setPlainText("\n".join(event_log.lines) + ("\n" if event_log.lines else ""))
+        self._scroll_to_end()
+        event_log.lineAdded.connect(self._on_line_added)
 
-    def _ts(self) -> str:
-        return time.strftime("%H:%M:%S")
+    def _scroll_to_end(self):
+        sb = self.log_box.verticalScrollBar()
+        sb.setValue(sb.maximum())
 
-    def _write_startup_info(self):
-        lines = [
-            f"[{self._ts()}] SubTranscribe v{APP_VER} initialized cleanly.",
-            f"[{self._ts()}] Backend detected: {BACKEND}",
-            f"[{self._ts()}] Device compute mode: {DEVICE} ({COMPUTE_TYPE})",
-            f"[{self._ts()}] GPU Name: {GPU_NAME or 'None detected'}",
-            f"[{self._ts()}] FFmpeg Binary: {FFMPEG_PATH or 'Not Found'}",
-            f"[{self._ts()}] System Status: All Systems Operational.",
-        ]
-        self.log_box.setPlainText("\n".join(lines) + "\n")
+    def _on_line_added(self, line: str):
+        self.log_box.appendPlainText(line)
+        self._scroll_to_end()
 
     def _copy_logs(self):
         txt = self.log_box.toPlainText().strip()
@@ -83,5 +82,7 @@ class LogsPage(QWidget):
             self.main_window.state.set_status("Logs copied to clipboard!", "")
 
     def _clear_logs(self):
-        self.log_box.setPlainText(f"[{self._ts()}] Event logs cleared.\n")
+        event_log.clear()
+        self.log_box.clear()
+        log_event("Event logs cleared.")
         self.main_window.state.set_status("Logs cleared.", "")

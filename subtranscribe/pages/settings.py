@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..backend.device import DEVICE_LABEL, DEVICE_COLOR
+from ..backend.eventlog import log_event
 from ..backend.models import delete_model_files
 from ..backend.history import clear_history
 from ..config import (
@@ -208,6 +209,7 @@ shortcut.Save
             if delete_model_files(m_size):
                 count += 1
         clear_history()
+        log_event(f"Purged all local data: {count} model packages and history cleared.")
         self.main_window.invalidate_page("Models")
         self.main_window.invalidate_page("History")
         QMessageBox.information(self, "Cleanup Complete", f"Successfully purged {count} model packages and all cached data.\nZero traces remain.")

@@ -19,6 +19,7 @@ from .backend.subtitles import WRITERS, write_ass, _fmt_srt
 from .backend.transcribe import transcribe
 from .backend.translate import resolve_translate_fn
 from .backend.history import add_history_entry
+from .backend.eventlog import log_event
 from .backend.models import build_progress_tracker, poll_download_progress
 from .backend.device import USE_WHISPERCPP
 from .backend.update import check_for_update, find_installer_asset_url
@@ -69,6 +70,8 @@ class TranscribeWorker(QThread):
 
     def run(self):
         inp = self.input_path
+        log_event(f"Transcription started: {Path(inp).name} (model={self.model_size}, "
+                   f"src={self.src_lang_name}, tgt={self.tgt_lang_name}, fmt={self.fmt})")
         try:
             suffix = Path(inp).suffix.lower()
             if suffix == ".wav":
@@ -77,12 +80,14 @@ class TranscribeWorker(QThread):
                 self.segmentReady.emit({"status": "Extracting audio with FFmpeg…"})
                 self._tmp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
                 if not extract_audio(inp, self._tmp_wav, FFMPEG_PATH):
+                    log_event(f"Transcription failed: {Path(inp).name} — FFmpeg failed to extract audio.")
                     self.error.emit("FFmpeg failed to extract audio.")
                     return
                 audio = self._tmp_wav
             elif suffix in _AUDIO_EXTS:
                 audio = inp
             else:
+                log_event(f"Transcription failed: {Path(inp).name} — FFmpeg not found.")
                 self.error.emit("FFmpeg not found. Provide a .wav/.mp3 file directly.")
                 return
 
@@ -93,6 +98,8 @@ class TranscribeWorker(QThread):
             # Resolve translation ONCE up front so each segment can be translated
             # live as it arrives (subgen.py:4189-4200).
             translate_fn = resolve_translate_fn(sl, self.tgt_lang_name)
+            if translate_fn:
+                log_event(f"Translation active: {Path(inp).name} → {self.tgt_lang_name}")
 
             self._start_time = time.time()
 
@@ -150,6 +157,7 @@ class TranscribeWorker(QThread):
                 self._finish(lang)
 
             def on_err(msg):
+                log_event(f"Transcription failed: {Path(inp).name} — {msg}")
                 self.error.emit(msg)
 
             self.segmentReady.emit({"status": f"Transcribing with {self.model_size}…"})
@@ -158,6 +166,7 @@ class TranscribeWorker(QThread):
                        condition_on_previous_text=self.condition_on_previous_text,
                        word_timestamps=self.word_timestamps)
         except Exception as e:
+            log_event(f"Transcription failed: {Path(inp).name} — {e}")
             self.error.emit(str(e))
         finally:
             if self._tmp_wav and os.path.exists(self._tmp_wav):
@@ -182,8 +191,12 @@ class TranscribeWorker(QThread):
             else:
                 WRITERS[self.fmt](segs, out_path)
         except Exception as e:
+            log_event(f"Transcription failed: {Path(inp).name} — write error: {e}")
             self.error.emit(f"Write error: {e}")
             return
+
+        log_event(f"Transcription completed: {Path(inp).name} → {Path(out_path).name} "
+                   f"({len(segs)} segments, {self.fmt})")
 
         add_history_entry({
             "id": str(int(time.time())),
@@ -305,6 +318,7 @@ class DownloadWorker(QThread):
         poller = _threading.Thread(target=_poll, daemon=True)
         poller.start()
 
+        log_event(f"Model download started: {model_size} ({repo})")
         try:
             self.progress.emit({"pct": 0.02, "status": f"Downloading {model_size} from HuggingFace…"})
             if USE_WHISPERCPP:
@@ -316,10 +330,12 @@ class DownloadWorker(QThread):
 
             dl_active[0] = False
             poller.join(timeout=1.5)
+            log_event(f"Model download completed: {model_size}")
             self.finished_ok.emit(model_size)
         except Exception as e:
             dl_active[0] = False
             poller.join(timeout=1.5)
+            log_event(f"Model download failed: {model_size} — {e}")
             self.error.emit(str(e))
         finally:
             dl_active[0] = False
