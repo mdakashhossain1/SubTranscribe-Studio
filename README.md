@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="SubTranscribe Studio Logo" width="140">
+  <img src="subtranscribe/assets/logo.png" alt="SubTranscribe Studio Logo" width="140">
 </p>
 
 <h1 align="center">SubTranscribe Studio</h1>
@@ -78,9 +78,11 @@ It can:
 ---
 
 ### 🐧 Linux (Ubuntu / Debian / Fedora / Arch)
-1. Install system audio & video dependencies:
+1. Install system audio, video & Qt/PySide6 runtime dependencies:
    ```bash
-   sudo apt update && sudo apt install -y ffmpeg portaudio19-dev python3-tk
+   sudo apt update && sudo apt install -y ffmpeg portaudio19-dev \
+     libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
+     libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libegl1 libgl1
    ```
 2. Download **`SubTranscribe-Studio-Linux-x86_64.tar.gz`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
 3. Extract and launch:
@@ -94,7 +96,9 @@ It can:
 ### 🍓 Raspberry Pi OS (Raspberry Pi 4 / 5 - ARM64 Linux)
 1. Install system dependencies:
    ```bash
-   sudo apt update && sudo apt install -y ffmpeg portaudio19-dev python3-tk
+   sudo apt update && sudo apt install -y ffmpeg portaudio19-dev \
+     libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
+     libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libegl1 libgl1
    ```
 2. Download **`SubTranscribe-Studio-RaspberryPi-arm64.tar.gz`** from [Releases](https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest).
 3. Extract and launch:
@@ -142,27 +146,27 @@ It can:
      ```cmd
      run.bat
      ```
-     *(Or manually: `python -m venv .venv` then `.venv\Scripts\activate`)*
+     *(Or manually: `python -m venv subtranscribe\.venv` then `subtranscribe\.venv\Scripts\activate`)*
    - **Linux / macOS**:
      ```bash
-     python3 -m venv .venv
-     source .venv/bin/activate
-     pip install -r requirements.txt
-     python3 subgen.py
+     python3 -m venv subtranscribe/.venv
+     source subtranscribe/.venv/bin/activate
+     pip install -r subtranscribe/requirements.txt
+     python3 main.py
      ```
 
 ---
 
 ## A Tour of the App
 
-The app is organized into a sidebar of screens. Here's what each one does.
+The app is organized into a sidebar of screens, with a persistent header (active backend/FFmpeg status, detected GPU/compute mode) and a live system status footer (CPU/RAM/GPU/disk/temperature, elapsed time) visible on every screen. Here's what each sidebar entry does.
 
 ### 🎛️ Dashboard
 
 The main workspace, and the screen you land on when you open the app. It's split into two halves:
 
-- **Left side** — pick your input media file and output folder, choose your AI model, source language, translation target, and output format, and fine-tune advanced engine options (compute precision, beam size, etc.). A big **Generate Subtitles** button starts the job.
-- **Right side** — live progress while a file is being processed (percentage complete, processing speed, segment count, real-time speed multiplier, GPU usage), plus a **Live Transcript Studio** with a real waveform player: play/pause, click-to-seek, zoom in/out, and lines that highlight in sync with playback so you can verify — and directly edit — anything transcribed incorrectly.
+- **Left side** — pick your input media file and output folder, choose your AI model, source language, translation target, and output format, with at-a-glance status pills (accuracy, detected hardware, model download state, translator/FFmpeg/backend health) and advanced engine options (compute precision, beam size, best-of, temperature, word count per subtitle) — including a **Reset to Best (Auto)** button that detects your hardware and dials every setting to the strongest configuration it can actually run. A big **Generate Subtitles** button starts the job.
+- **Right side** — six live stat tiles while a file is being processed (overall progress, time processed/remaining, speed multiplier, segment count, real-time factor), plus a **Live Transcript Studio** table (start/end/duration/text per segment, filterable, double-click a row to jump the waveform player there) and a real waveform audio preview with play/mute and zoom in/out/reset controls.
 
 Use this screen for everyday, single-file transcription with full control over every setting.
 
@@ -210,7 +214,7 @@ Bigger models are more accurate but need more disk space, memory, and time. Each
   <img src="image/models.png" alt="AI Model Manager" width="100%">
 </p>
 
-### ⚙️ Settings
+### ⚙️ App Settings
 
 Application-wide preferences that apply no matter which file you're working on:
 
@@ -257,7 +261,7 @@ A quick built-in user guide covering how to generate subtitles, how GPU accelera
 
 ### ℹ️ About
 
-Information about the app itself: version number, active compute mode, the core features list, and the underlying technology it's built on (Python, CustomTkinter, faster-whisper/CTranslate2, whisper.cpp, FFmpeg, Bootstrap Icons).
+Information about the app itself: version number, active compute mode, the core features list, and the underlying technology it's built on (Python, PySide6/Qt for Python, faster-whisper/CTranslate2, whisper.cpp, FFmpeg, Bootstrap Icons rendered via native Qt SVG).
 
 <p align="center">
   <img src="image/about.png" alt="About SubTranscribe Studio" width="100%">

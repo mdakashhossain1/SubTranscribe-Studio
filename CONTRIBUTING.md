@@ -50,7 +50,7 @@ Feature requests are tracked as GitHub issues. When suggesting a feature:
    ```bash
    git checkout -b feature/my-awesome-feature
    ```
-2. Make your changes and test locally (`python subgen.py`).
+2. Make your changes and test locally (`python main.py`).
 3. Commit your changes with clear, descriptive commit messages.
 4. Push to your branch and open a **Pull Request** against `main`.
 
@@ -66,30 +66,39 @@ Feature requests are tracked as GitHub issues. When suggesting a feature:
 
 2. **Create a virtual environment**:
    ```bash
-   python -m venv .venv
-   .venv\Scripts\activate
+   python -m venv subtranscribe/.venv
+   subtranscribe\.venv\Scripts\activate
    ```
 
 3. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+   pip install -r subtranscribe/requirements.txt
    ```
 
 4. **Run the application**:
    ```bash
-   python subgen.py
+   python main.py
    ```
 
 ---
 
 ## Project Architecture
 
-- **`subgen.py`**: Main Tkinter / CustomTkinter application source code containing UI screens, Whisper AI engine orchestration, waveform rendering, and background worker threads.
-- **`assets/`**: Icons, Bootstrap SVG vector icons, fonts, and brand assets.
+- **`main.py`**: Thin entry point (`from subtranscribe.app import main`) — this is the literal script PyInstaller/CI build from, so it stays at the repo root.
+- **`subtranscribe/`**: The application package (PySide6 / Qt for Python).
+  - **`app.py`**: `QApplication` bootstrap.
+  - **`main_window.py`**: Main window, sidebar navigation, and the persistent header/footer chrome (backend/GPU status, live system telemetry).
+  - **`backend/`**: Pure business logic with no UI dependencies — transcription (`faster-whisper` / `whisper.cpp`), translation, subtitle export (SRT/VTT/ASS/TXT), model download/management, device detection, update checking. Unit-testable in isolation.
+  - **`pages/`**: One file per sidebar screen (`dashboard.py`, `transcribe.py`, `batch.py`, `models.py`, `history.py`, `telemetry.py`, `logs.py`, `settings.py`, `help.py`, `about.py`).
+  - **`widgets/`**: Reusable UI components (searchable language picker, waveform player, card/stat-tile helpers, shared stylesheets, themed dialogs).
+  - **`workers.py`**: `QThread` background workers (transcription, model downloads, live telemetry, update checks) that marshal results back to the UI thread via Qt signals.
+  - **`config.py` / `paths.py` / `icons.py`**: Theme/config constants, frozen-aware filesystem paths (dev vs. packaged `.exe`), and icon loading (native Qt SVG rendering).
+  - **`assets/`**: Icons, Bootstrap SVG vector icons, fonts, flags, and brand assets — colocated with the code that uses them.
+  - **`requirements.txt`**, **`.venv/`**: Python dependencies and the local virtual environment, also colocated inside the package.
 - **`bin/`**: Vendored `whisper.cpp` binaries and runtime DLLs for Vulkan / CPU fallback processing.
 - **`installer.iss`**: Inno Setup installer script for Windows distribution.
-- **`build.bat`**: Windows PyInstaller bundling script.
-- **`.github/workflows/build-windows.yml`**: Continuous integration build and release automation.
+- **`build.bat`** / **`run.bat`**: Windows PyInstaller bundling script and first-run launcher.
+- **`.github/workflows/build-desktop.yml`**: Multi-platform (Windows/Linux/macOS/Raspberry Pi/Docker) build and release automation.
 
 ---
 
