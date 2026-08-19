@@ -73,7 +73,7 @@ except ImportError:
     HAS_PSUTIL = False
 
 try:
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageTk
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
@@ -123,7 +123,10 @@ def get_bs_icon(icon_name: str, color: str = "#94A3B8", size: int = 18) -> ctk.C
 
     try:
         if _FITZ_MODULE is None:
-            import fitz
+            try:
+                import pymupdf as fitz
+            except ImportError:
+                import fitz
             _FITZ_MODULE = fitz
         else:
             fitz = _FITZ_MODULE
@@ -149,6 +152,40 @@ try:
     HAS_TRANSLATOR = True
 except ImportError:
     HAS_TRANSLATOR = False
+
+def transliterate_to_roman(text, src="hi"):
+    """
+    Transliterates native Indic/Devanagari text into natural conversational Roman English (Hinglish/Banglish/etc.).
+    E.g. 'हेलो हेलो एवरीवन वेलकम बैक' -> 'Hello hello everyone welcome back'
+    """
+    if not text or not text.strip():
+        return text
+    src_code = src if src and src not in ("auto", "None", "hinglish") else "hi"
+    url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={src_code}&tl=en&dt=rm&dt=t&q={urllib.parse.quote(text)}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            romanized = []
+            if data and data[0]:
+                for item in data[0]:
+                    if len(item) > 3 and item[3]:
+                        romanized.append(item[3])
+                    elif len(item) > 2 and item[2]:
+                        romanized.append(item[2])
+            if romanized:
+                res = " ".join(romanized).strip()
+                if res:
+                    return res[0].upper() + res[1:] if len(res) > 1 else res.upper()
+    except Exception:
+        pass
+    # Fallback to indic_transliteration if installed
+    try:
+        from indic_transliteration import sanscript
+        from indic_transliteration.sanscript import transliterate
+        return transliterate(text, sanscript.DEVANAGARI, sanscript.ITRANS)
+    except Exception:
+        return text
 
 # ── Inter Font Family Loader (High legibility modern UI typography)
 FONTS_DIR = PROJECT_DIR / "assets" / "fonts"
@@ -224,51 +261,397 @@ WARNING      = "#F59E0B"  # Amber warning status
 ERROR_C      = "#EF4444"  # Rose Red error state
 
 LANGUAGE_MAP = {
-    "Auto Detect":       None,
-    "Hindi":             "hi",
-    "English":           "en",
-    "Indian English":    "en",    # English as used in India
-    "Arabic":            "ar",
-    "Urdu":              "ur",
-    "Spanish":           "es",
-    "French":            "fr",
-    "German":            "de",
-    "Japanese":          "ja",
-    "Chinese":           "zh-CN",
-    "Korean":            "ko",
-    "Russian":           "ru",
-    "Portuguese":        "pt",
-    "Italian":           "it",
-    "Turkish":           "tr",
-    "Bengali":           "bn",
-    "Tamil":             "ta",
-    "Telugu":            "te",
-    "Punjabi":           "pa",
-    "Marathi":           "mr",
-    "Gujarati":          "gu",
+    "Auto Detect":                      None,
+    "English":                          "en",
+    "हिन्दी (Hindi)":                   "hi",
+    "বাংলা (Bengali)":                  "bn",
+    "ગુજરાતી (Gujarati)":               "gu",
+    "मराठी (Marathi)":                  "mr",
+    "தமிழ் (Tamil)":                    "ta",
+    "తెలుగు (Telugu)":                   "te",
+    "ಕನ್ನಡ (Kannada)":                  "kn",
+    "മലയാളം (Malayalam)":              "ml",
+    "ਪੰਜਾਬੀ (Punjabi)":                 "pa",
+    "ଓଡ଼ିଆ (Odia)":                     "or",
+    "অসমীয়া (Assamese)":               "as",
+    "नेपाली (Nepali)":                  "ne",
+    "اردو (Urdu)":                      "ur",
+    "العربية (Arabic)":                 "ar",
+    "فارسی (Persian)":                  "fa",
+    "Русский (Russian)":                "ru",
+    "Українська (Ukrainian)":           "uk",
+    "Deutsch (German)":                 "de",
+    "Français (French)":                "fr",
+    "Español (Spanish)":                "es",
+    "Português (Portuguese)":           "pt",
+    "Italiano (Italian)":               "it",
+    "Nederlands (Dutch)":               "nl",
+    "Polski (Polish)":                  "pl",
+    "Türkçe (Turkish)":                 "tr",
+    "Ελληνικά (Greek)":                 "el",
+    "Čeština (Czech)":                  "cs",
+    "Magyar (Hungarian)":               "hu",
+    "Română (Romanian)":                "ro",
+    "Svenska (Swedish)":                "sv",
+    "Dansk (Danish)":                   "da",
+    "Suomi (Finnish)":                  "fi",
+    "Norsk (Norwegian)":                "no",
+    "Bahasa Indonesia (Indonesian)":    "id",
+    "Bahasa Melayu (Malay)":            "ms",
+    "Tiếng Việt (Vietnamese)":          "vi",
+    "ไทย (Thai)":                       "th",
+    "Tagalog (Filipino)":               "tl",
+    "עברית (Hebrew)":                   "iw",
+    "日本語 (Japanese)":                 "ja",
+    "中文 (Chinese)":                    "zh-CN",
+    "한국어 (Korean)":                   "ko",
+    "Indian English (Hinglish - रोमन हिन्दी)": "hinglish",
+    "Indian English (भारतीय अंग्रेज़ी)": "hinglish",
 }
 
-WHISPER_LANG_MAP = {
-    "Auto Detect":      None,
-    "Hindi":            "hi",
-    "English":          "en",
-    "Indian English":   "en",   # Whisper treats as English
-    "Arabic":           "ar",
-    "Urdu":             "ur",
-    "Spanish":          "es",
-    "French":           "fr",
-    "German":           "de",
-    "Japanese":         "ja",
-    "Chinese":          "zh",
-    "Korean":           "ko",
-    "Russian":          "ru",
-    "Portuguese":       "pt",
-    "Italian":          "it",
-    "Turkish":          "tr",
-    "Bengali":          "bn",
-    "Tamil":            "ta",
-    "Telugu":           "te",
+# ── Per-language font table for ASS subtitles
+# Maps GoogleTranslate language codes → (font_name, supports_italic)
+# Indic and Arabic scripts have full support in Nirmala UI / Arial Unicode MS on Windows.
+LANG_FONT_MAP = {
+    # Latin / Romanized scripts
+    "en":       ("Arial",                True),
+    "hinglish": ("Arial",                True),
+    "es":       ("Arial",                True),
+    "fr":       ("Arial",                True),
+    "de":       ("Arial",                True),
+    "it":       ("Arial",                True),
+    "pt":       ("Arial",                True),
+    "ru":       ("Arial",                True),
+    "uk":       ("Arial",                True),
+    "tr":       ("Arial",                True),
+    "nl":       ("Arial",                True),
+    "pl":       ("Arial",                True),
+    "el":       ("Arial",                True),
+    "cs":       ("Arial",                True),
+    "hu":       ("Arial",                True),
+    "ro":       ("Arial",                True),
+    "sv":       ("Arial",                True),
+    "da":       ("Arial",                True),
+    "fi":       ("Arial",                True),
+    "no":       ("Arial",                True),
+    "id":       ("Arial",                True),
+    "ms":       ("Arial",                True),
+    "vi":       ("Arial",                True),
+    "tl":       ("Arial",                True),
+    # Indic languages (Nirmala UI has full Windows native support & italic)
+    "hi":    ("Nirmala UI",           True),
+    "mr":    ("Nirmala UI",           True),
+    "bn":    ("Nirmala UI",           True),
+    "gu":    ("Nirmala UI",           True),
+    "ta":    ("Nirmala UI",           True),
+    "te":    ("Nirmala UI",           True),
+    "kn":    ("Nirmala UI",           True),
+    "ml":    ("Nirmala UI",           True),
+    "pa":    ("Nirmala UI",           True),
+    "or":    ("Nirmala UI",           True),
+    "as":    ("Nirmala UI",           True),
+    "ne":    ("Nirmala UI",           True),
+    # Arabic / Urdu / Persian
+    "ar":    ("Arial Unicode MS",     True),
+    "ur":    ("Arial Unicode MS",     True),
+    "fa":    ("Arial Unicode MS",     True),
+    "he":    ("Arial",                True),
+    "iw":    ("Arial",                True),
+    "th":    ("Leelawadee UI",        True),
+    # CJK
+    "zh-CN": ("Microsoft YaHei",      False),
+    "ja":    ("MS Gothic",            False),
+    "ko":    ("Malgun Gothic",        False),
 }
+_DEFAULT_FONT = ("Arial", True)   # fallback for unknown codes
+
+WHISPER_LANG_MAP = {
+    "Auto Detect":                      None,
+    "English":                          "en",
+    "हिन्दी (Hindi)":                   "hi",
+    "বাংলা (Bengali)":                  "bn",
+    "ગુજરાતી (Gujarati)":               "gu",
+    "मराठी (Marathi)":                  "mr",
+    "தமிழ் (Tamil)":                    "ta",
+    "తెలుగు (Telugu)":                   "te",
+    "ಕನ್ನಡ (Kannada)":                  "kn",
+    "മലയാളം (Malayalam)":              "ml",
+    "ਪੰਜਾਬੀ (Punjabi)":                 "pa",
+    "ଓଡ଼ିଆ (Odia)":                     "or",
+    "অসমীয়া (Assamese)":               "as",
+    "नेपाली (Nepali)":                  "ne",
+    "اردو (Urdu)":                      "ur",
+    "العربية (Arabic)":                 "ar",
+    "فارسی (Persian)":                  "fa",
+    "Русский (Russian)":                "ru",
+    "Українська (Ukrainian)":           "uk",
+    "Deutsch (German)":                 "de",
+    "Français (French)":                "fr",
+    "Español (Spanish)":                "es",
+    "Português (Portuguese)":           "pt",
+    "Italiano (Italian)":               "it",
+    "Nederlands (Dutch)":               "nl",
+    "Polski (Polish)":                  "pl",
+    "Türkçe (Turkish)":                 "tr",
+    "Ελληνικά (Greek)":                 "el",
+    "Čeština (Czech)":                  "cs",
+    "Magyar (Hungarian)":               "hu",
+    "Română (Romanian)":                "ro",
+    "Svenska (Swedish)":                "sv",
+    "Dansk (Danish)":                   "da",
+    "Suomi (Finnish)":                  "fi",
+    "Norsk (Norwegian)":                "no",
+    "Bahasa Indonesia (Indonesian)":    "id",
+    "Bahasa Melayu (Malay)":            "ms",
+    "Tiếng Việt (Vietnamese)":          "vi",
+    "ไทย (Thai)":                       "th",
+    "Tagalog (Filipino)":               "tl",
+    "עברית (Hebrew)":                   "he",
+    "日本語 (Japanese)":                 "ja",
+    "中文 (Chinese)":                    "zh",
+    "한국어 (Korean)":                   "ko",
+    "Indian English (Hinglish - रोमन हिन्दी)": "hi",
+    "Indian English (भारतीय अंग्रेज़ी)": "hi",
+}
+
+FLAG_ICON_MAP = {
+    "Auto Detect":                      "un.png",
+    "None":                             "un.png",
+    "English":                          "gb.png",
+    "हिन्दी (Hindi)":                   "in.png",
+    "বাংলা (Bengali)":                  "bd.png",
+    "ગુજરાતી (Gujarati)":               "in.png",
+    "मराठी (Marathi)":                  "in.png",
+    "தமிழ் (Tamil)":                    "in.png",
+    "తెలుగు (Telugu)":                   "in.png",
+    "ಕನ್ನಡ (Kannada)":                  "in.png",
+    "മലയാളം (Malayalam)":              "in.png",
+    "ਪੰਜਾਬੀ (Punjabi)":                 "in.png",
+    "ଓଡ଼ିଆ (Odia)":                     "in.png",
+    "অসমীয়া (Assamese)":               "in.png",
+    "नेपाली (Nepali)":                  "np.png",
+    "اردو (Urdu)":                      "pk.png",
+    "العربية (Arabic)":                 "sa.png",
+    "فارسی (Persian)":                  "ir.png",
+    "Русский (Russian)":                "ru.png",
+    "Українська (Ukrainian)":           "ua.png",
+    "Deutsch (German)":                 "de.png",
+    "Français (French)":                "fr.png",
+    "Español (Spanish)":                "es.png",
+    "Português (Portuguese)":           "br.png",
+    "Italiano (Italian)":               "it.png",
+    "Nederlands (Dutch)":               "nl.png",
+    "Polski (Polish)":                  "pl.png",
+    "Türkçe (Turkish)":                 "tr.png",
+    "Ελληνικά (Greek)":                 "gr.png",
+    "Čeština (Czech)":                  "cz.png",
+    "Magyar (Hungarian)":               "hu.png",
+    "Română (Romanian)":                "ro.png",
+    "Svenska (Swedish)":                "se.png",
+    "Dansk (Danish)":                   "dk.png",
+    "Suomi (Finnish)":                  "fi.png",
+    "Norsk (Norwegian)":                "no.png",
+    "Bahasa Indonesia (Indonesian)":    "id.png",
+    "Bahasa Melayu (Malay)":            "my.png",
+    "Tiếng Việt (Vietnamese)":          "vn.png",
+    "ไทย (Thai)":                       "th.png",
+    "Tagalog (Filipino)":               "ph.png",
+    "עברית (Hebrew)":                   "il.png",
+    "日本語 (Japanese)":                 "jp.png",
+    "中文 (Chinese)":                    "cn.png",
+    "한국어 (Korean)":                   "kr.png",
+    "Indian English (Hinglish - रोमन हिन्दी)": "in.png",
+    "Indian English (भारतीय अंग्रेज़ी)": "in.png",
+}
+
+_FLAG_PHOTO_CACHE = {}
+_FLAG_CTK_CACHE = {}
+
+def get_flag_photo(flag_filename, size=(22, 15)):
+    """Load and cache PhotoImage for country flags."""
+    if not flag_filename:
+        return None
+    key = (flag_filename, size)
+    if key in _FLAG_PHOTO_CACHE:
+        return _FLAG_PHOTO_CACHE[key]
+    flag_dir = Path(__file__).resolve().parent / "assets" / "flags"
+    file_path = flag_dir / flag_filename
+    if file_path.exists():
+        try:
+            im = Image.open(file_path).resize(size, Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(im)
+            _FLAG_PHOTO_CACHE[key] = photo
+            return photo
+        except Exception:
+            pass
+    return None
+
+def get_flag_ctk_image(flag_filename, size=(22, 15)):
+    """Load and cache CTkImage for country flags."""
+    if not flag_filename:
+        return None
+    key = (flag_filename, size)
+    if key in _FLAG_CTK_CACHE:
+        return _FLAG_CTK_CACHE[key]
+    flag_dir = Path(__file__).resolve().parent / "assets" / "flags"
+    file_path = flag_dir / flag_filename
+    if file_path.exists():
+        try:
+            im = Image.open(file_path).resize(size, Image.Resampling.LANCZOS)
+            ctk_img = ctk.CTkImage(light_image=im, dark_image=im, size=size)
+            _FLAG_CTK_CACHE[key] = ctk_img
+            return ctk_img
+        except Exception:
+            pass
+    return None
+
+class SearchableLanguageSelect(ctk.CTkFrame):
+    """
+    Compact, modern searchable and scrollable dropdown with real flag icons.
+    Prevents giant screen-occupying menus and lets users type-to-search or scroll.
+    """
+    def __init__(self, parent, variable, values, width=180, height=38, command=None,
+                 fg_color=None, button_color=None, dropdown_fg_color=None, **kwargs):
+        super().__init__(parent, fg_color="transparent", height=height)
+        self.variable = variable
+        self.values = values
+        self.command_cb = command
+        self.popup = None
+        self.height_val = height
+
+        bg = fg_color or INPUT_BG
+        btn_col = button_color or ACCENT
+
+        self.btn = ctk.CTkButton(
+            self, text="", height=height, corner_radius=6,
+            fg_color=bg, hover_color=PANEL_BG, text_color=TEXT_MAIN,
+            border_width=1, border_color=BORDER_COLOR,
+            anchor="w", font=ctk.CTkFont(FONT_FAMILY, 13, "bold"),
+            command=self.toggle_popup
+        )
+        self.btn.pack(fill="both", expand=True)
+
+        self._arrow = ctk.CTkLabel(self.btn, text="▼", text_color=TEXT_SUB,
+                                   font=ctk.CTkFont(FONT_FAMILY, 9))
+        self._arrow.place(relx=1.0, rely=0.5, anchor="e", x=-10)
+
+        self._sync_button_display()
+        self.variable.trace_add("write", lambda *_: self._sync_button_display())
+
+    def _sync_button_display(self):
+        val = self.variable.get()
+        flag_file = FLAG_ICON_MAP.get(val)
+        ctk_img = get_flag_ctk_image(flag_file, (20, 14)) if flag_file else None
+        if ctk_img:
+            self.btn.configure(text=f"  {val}", image=ctk_img, compound="left")
+        else:
+            self.btn.configure(text=f"  {val}", image=None)
+
+    def toggle_popup(self):
+        if self.popup and self.popup.winfo_exists():
+            self.popup.destroy()
+            self.popup = None
+        else:
+            self.open_popup()
+
+    def open_popup(self):
+        self.popup = ctk.CTkToplevel(self)
+        self.popup.overrideredirect(True)
+        self.popup.attributes("-topmost", True)
+        self.popup.configure(fg_color=PANEL_BG)
+
+        self.update_idletasks()
+        x = self.btn.winfo_rootx()
+        y = self.btn.winfo_rooty() + self.btn.winfo_height() + 4
+        w = max(self.btn.winfo_width(), 280)
+        h = 320
+
+        screen_h = self.winfo_screenheight()
+        if y + h > screen_h - 40:
+            y = self.btn.winfo_rooty() - h - 4
+
+        self.popup.geometry(f"{w}x{h}+{x}+{y}")
+
+        border_frame = ctk.CTkFrame(self.popup, fg_color=CARD_BG, corner_radius=8,
+                                    border_width=1, border_color=BORDER_COLOR)
+        border_frame.pack(fill="both", expand=True)
+
+        search_f = ctk.CTkFrame(border_frame, fg_color=INPUT_BG, corner_radius=6,
+                                border_width=1, border_color=BORDER_COLOR)
+        search_f.pack(fill="x", padx=8, pady=(8, 6))
+
+        search_entry = ctk.CTkEntry(
+            search_f, placeholder_text="🔍 Type to search language…",
+            fg_color="transparent", border_width=0, text_color=TEXT_MAIN,
+            font=ctk.CTkFont(FONT_FAMILY, 12)
+        )
+        search_entry.pack(fill="x", padx=6, pady=4)
+        search_entry.focus_set()
+
+        scroll = ctk.CTkScrollableFrame(
+            border_frame, fg_color="transparent", height=230,
+            scrollbar_button_color=BORDER_COLOR, scrollbar_button_hover_color=ACCENT
+        )
+        scroll.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+
+        def render_list(filter_text=""):
+            for child in scroll.winfo_children():
+                child.destroy()
+
+            q = filter_text.strip().lower()
+            filtered = [v for v in self.values if q in v.lower()]
+            if not filtered:
+                ctk.CTkLabel(scroll, text="No languages found", text_color=TEXT_SUB,
+                             font=ctk.CTkFont(FONT_FAMILY, 12)).pack(pady=30)
+                return
+
+            for val in filtered:
+                is_selected = (val == self.variable.get())
+                flag_file = FLAG_ICON_MAP.get(val)
+                ctk_img = get_flag_ctk_image(flag_file, (20, 14)) if flag_file else None
+
+                item = ctk.CTkButton(
+                    scroll, text=f"  {val}", anchor="w", height=32, corner_radius=5,
+                    fg_color=INPUT_BG if is_selected else "transparent",
+                    hover_color=PANEL_BG,
+                    text_color=ACCENT if is_selected else TEXT_MAIN,
+                    font=ctk.CTkFont(FONT_FAMILY, 12, "bold" if is_selected else "normal"),
+                    image=ctk_img, compound="left",
+                    command=lambda v=val: self._select_val(v)
+                )
+                item.pack(fill="x", pady=1)
+
+        render_list()
+        search_entry.bind("<KeyRelease>", lambda e: render_list(search_entry.get()))
+        self.popup.bind("<Escape>", lambda e: self._close_popup())
+
+    def _select_val(self, val):
+        self.variable.set(val)
+        self._sync_button_display()
+        self._close_popup()
+        if self.command_cb:
+            self.command_cb(val)
+
+    def _close_popup(self):
+        if self.popup and self.popup.winfo_exists():
+            self.popup.destroy()
+            self.popup = None
+
+def attach_flags_to_optionmenu(opt_menu, values):
+    """Attach real color flag images compound-left to CustomTkinter OptionMenu's dropdown."""
+    try:
+        dm = opt_menu._dropdown_menu
+        dm.delete(0, "end")
+        for val in values:
+            flag_file = FLAG_ICON_MAP.get(val)
+            photo = get_flag_photo(flag_file) if flag_file else None
+            if photo:
+                dm.add_command(label="  " + val, image=photo, compound="left",
+                               command=lambda v=val: opt_menu._dropdown_callback(v))
+            else:
+                dm.add_command(label=val, command=lambda v=val: opt_menu._dropdown_callback(v))
+    except Exception:
+        pass
 
 # ── GPU-optimised models (ordered: best accuracy → fastest)
 # All run on GPU (float16). Falls back to CPU (int8) automatically.
@@ -743,13 +1126,22 @@ def write_vtt(segs, path):
         lines += [str(i), f"{_fmt_vtt(seg['start'])} --> {_fmt_vtt(seg['end'])}", seg['text'].strip(), ""]
     open(path, "w", encoding="utf-8").write("\n".join(lines))
 
-def write_ass(segs, path):
+def write_ass(segs, path, lang_code=None):
+    """Write an ASS subtitle file.
+
+    lang_code is the GoogleTranslate/ISO-639 code of the *output* language
+    (e.g. 'hi', 'bn', 'de').  When provided, the correct Unicode-aware font
+    is chosen so Indic/Arabic/CJK scripts actually render instead of showing
+    boxes.  Italic is disabled for scripts that don't support it.
+    """
+    font_name, allow_italic = LANG_FONT_MAP.get(lang_code or "", _DEFAULT_FONT)
+    italic_flag = "-1" if allow_italic else "0"   # ASS: -1 = on, 0 = off
     hdr = ("[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n\n"
            "[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,"
            "OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,"
            "Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n"
-           "Style: Default,Arial,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
-           "-1,0,0,0,100,100,0,0,1,2,2,2,10,10,20,1\n\n"
+           f"Style: Default,{font_name},48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+           f"-1,{italic_flag},0,0,100,100,0,0,1,2,2,2,10,10,20,1\n\n"
            "[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n")
     lines = [hdr]
     for seg in segs:
@@ -765,58 +1157,52 @@ def write_txt(segs, path):
 WRITERS = {"SRT": write_srt, "VTT": write_vtt, "ASS": write_ass, "TXT": write_txt}
 
 
-def resegment_by_sentence(segs, max_words=10):
-    """Re-segment Whisper output so every subtitle block is a readable phrase
-    rather than an arbitrary chunk boundary.
+def resegment_by_sentence(segs, max_words=3, max_duration=2.2):
+    """Re-segment Whisper output using true acoustic word timestamps with millisecond precision,
+    ensuring subtitles are broken into dynamic 1-2 second (2-4 words) readable chunks.
 
     Priority order for splitting:
-      1. Sentence-ending punctuation  (. ? !)  -- always splits here.
-      2. Comma-separated clause       (,)       -- splits after a comma when
-         the current clause already has >= max_words//2 words.
-      3. Hard word-count cap          (max_words) -- forces a split even with
-         no punctuation so subtitles never exceed a comfortable reading length.
-
-    Algorithm
-    ---------
-    1. Build a flat per-word timeline by distributing each Whisper segment's
-       duration evenly across the words it contains.
-    2. Walk the word list applying the split rules above.
-    3. Flush any remaining words as the final subtitle block.
-
-    Returns a list of {'start', 'end', 'text'} dicts -- the same shape that
-    write_srt / write_vtt / etc. expect.  Falls back to the original list if
-    nothing could be parsed.
+      1. Acoustic word timestamps if provided by Whisper model.
+      2. Sentence & clause boundaries (. ? ! , ; :)
+      3. Hard duration cap (max_duration ~2.2s) & hard word cap (max_words)
     """
     if not segs:
         return segs
 
-    # -- Step 1: build a per-word timeline --
+    # -- Step 1: build a per-word timeline with acoustic timestamps --
     word_timeline = []  # [(start_sec, end_sec, word_str), ...]
     for seg in segs:
         text = (seg.get("text") or "").strip()
         if not text:
             continue
-        seg_start = float(seg.get("start") or 0.0)
-        seg_end   = float(seg.get("end")   or seg_start)
-        dur = max(seg_end - seg_start, 0.0)
-        words = text.split()
-        if not words:
-            continue
-        # Distribute duration evenly across words
-        w_dur = dur / len(words)
-        for j, w in enumerate(words):
-            ws = seg_start + j * w_dur
-            we = seg_start + (j + 1) * w_dur
-            word_timeline.append((ws, we, w))
+        # Use exact acoustic word timestamps if available from Whisper
+        raw_words = seg.get("words")
+        if raw_words and len(raw_words) > 0:
+            for w_obj in raw_words:
+                ws = float(w_obj.get("start", 0.0))
+                we = float(w_obj.get("end", ws))
+                w_str = str(w_obj.get("word", "")).strip()
+                if w_str:
+                    word_timeline.append((ws, we, w_str))
+        else:
+            seg_start = float(seg.get("start") or 0.0)
+            seg_end   = float(seg.get("end")   or seg_start)
+            dur = max(seg_end - seg_start, 0.0)
+            words = text.split()
+            if not words:
+                continue
+            w_dur = dur / len(words)
+            for j, w in enumerate(words):
+                ws = seg_start + j * w_dur
+                we = seg_start + (j + 1) * w_dur
+                word_timeline.append((ws, we, w))
 
     if not word_timeline:
         return segs
 
-    # -- Step 2: group words into subtitle blocks --
-    _SENT_END  = re.compile(r'[.?!]["\')\]]*$')   # terminal sentence punct
-    _COMMA_END = re.compile(r',$')                  # trailing comma
-
-    half_max = max(1, max_words // 2)
+    # -- Step 2: group words into dynamic short subtitle blocks --
+    _SENT_END  = re.compile(r'[.?!]["\')\]]*$')
+    _COMMA_END = re.compile(r'[,;:]$')
 
     sentences = []
     buf_words = []
@@ -837,15 +1223,13 @@ def resegment_by_sentence(segs, max_words=10):
         buf_words.append(word)
 
         n = len(buf_words)
+        curr_dur = we - buf_start
 
         if _SENT_END.search(word):
-            # Rule 1 -- sentence-ending punctuation: always split
             _flush(we)
-        elif _COMMA_END.search(word) and n >= half_max:
-            # Rule 2 -- comma after a decent clause length: split here
+        elif _COMMA_END.search(word) and (n >= 2 or curr_dur >= 1.2):
             _flush(we)
-        elif n >= max_words:
-            # Rule 3 -- hard cap: force split regardless of punctuation
+        elif n >= max_words or curr_dur >= max_duration:
             _flush(we)
 
     # -- Step 3: flush any trailing words --
@@ -1061,8 +1445,9 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
         return
     on_done(result, detected_lang)
 
-# ── Transcription (NoneType Safe)
-def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_error):
+# ── Transcription (NoneType Safe with Millisecond Word Timestamps)
+def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_error,
+               beam_size=5, temperature=0.0, condition_on_previous_text=False, word_timestamps=True):
     try:
         if USE_WHISPERCPP:
             transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error)
@@ -1076,7 +1461,15 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 cpu_threads=4,
             )
             t0 = time.time()
-            segs, info = model.transcribe(audio_path, language=source_lang, vad_filter=True, beam_size=5)
+            segs, info = model.transcribe(
+                audio_path,
+                language=source_lang,
+                vad_filter=True,
+                beam_size=beam_size,
+                temperature=temperature,
+                condition_on_previous_text=condition_on_previous_text,
+                word_timestamps=word_timestamps
+            )
             det = getattr(info, "language", "unknown") or "unknown"
             raw_dur = getattr(info, "duration", 0.0)
             total_duration = float(raw_dur) if raw_dur is not None else 0.0
@@ -1085,7 +1478,15 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 seg_start = float(getattr(seg, "start", 0.0) or 0.0)
                 seg_end   = float(getattr(seg, "end", 0.0) or 0.0)
                 seg_text  = str(getattr(seg, "text", "") or "")
-                s = {"start": seg_start, "end": seg_end, "text": seg_text}
+                seg_words = []
+                if hasattr(seg, "words") and seg.words:
+                    for w in seg.words:
+                        seg_words.append({
+                            "start": float(getattr(w, "start", 0.0) or 0.0),
+                            "end": float(getattr(w, "end", 0.0) or 0.0),
+                            "word": str(getattr(w, "word", "") or "").strip()
+                        })
+                s = {"start": seg_start, "end": seg_end, "text": seg_text, "words": seg_words}
                 result.append(s)
 
                 elapsed = max(0.001, time.time() - t0)
@@ -1100,7 +1501,15 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 model_size,
                 download_root=str(MODELS_DIR),   # ← always saves to project/models/
             )
-            result = model.transcribe(audio_path, language=source_lang, verbose=False)
+            result = model.transcribe(
+                audio_path,
+                language=source_lang,
+                verbose=False,
+                beam_size=beam_size,
+                temperature=temperature,
+                condition_on_previous_text=condition_on_previous_text,
+                word_timestamps=word_timestamps
+            )
             det = result.get("language", "unknown") or "unknown"
             raw_segs = result.get("segments", []) or []
             segs = []
@@ -1108,7 +1517,9 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 st = float(r.get("start", 0.0) or 0.0)
                 en = float(r.get("end", 0.0) or 0.0)
                 tx = str(r.get("text", "") or "")
-                segs.append({"start": st, "end": en, "text": tx})
+                raw_w = r.get("words", []) or []
+                seg_words = [{"start": float(w.get("start", 0.0)), "end": float(w.get("end", 0.0)), "word": str(w.get("word", "")).strip()} for w in raw_w]
+                segs.append({"start": st, "end": en, "text": tx, "words": seg_words})
             total_dur = segs[-1]["end"] if segs else 1.0
             for i, s in enumerate(segs, 1):
                 pct = i / len(segs)
@@ -1283,6 +1694,7 @@ class SubGenApp:
         self.temp_var     = tk.StringVar(value="0.0")
         self.cond_prev    = tk.BooleanVar(value=True)
         self.word_ts      = tk.BooleanVar(value=True)
+        self.max_words_var = tk.StringVar(value="3")
 
         # Telemetry tracking
         self.seg_count    = tk.IntVar(value=0)
@@ -1648,18 +2060,25 @@ class SubGenApp:
         ctrl_card = self._card(container, "Transcription Settings")
         grid = ctk.CTkFrame(ctrl_card, fg_color="transparent"); grid.pack(padx=16, pady=(0, 16), fill="x")
 
-        def quick_opt(parent, label, var, vals):
+        def quick_opt(parent, label, var, vals, is_lang=False):
             f = ctk.CTkFrame(parent, fg_color="transparent"); f.pack(side="left", expand=True, fill="x", padx=4)
             ctk.CTkLabel(f, text=label, text_color=TEXT_SUB, font=ctk.CTkFont(FONT_FAMILY, 12, "bold")).pack(anchor="w")
-            ctk.CTkOptionMenu(f, variable=var, values=vals, height=38, fg_color=INPUT_BG,
-                              button_color=ACCENT, button_hover_color=ACCENT_HOVER,
-                              dropdown_fg_color=PANEL_BG, dropdown_text_color=TEXT_MAIN,
-                              font=ctk.CTkFont(FONT_FAMILY, 13, "bold"), corner_radius=6).pack(fill="x", pady=(3, 0))
+            if is_lang:
+                w = SearchableLanguageSelect(f, variable=var, values=vals, height=38)
+                w.pack(fill="x", pady=(3, 0))
+                return w
+            else:
+                om = ctk.CTkOptionMenu(f, variable=var, values=vals, height=38, fg_color=INPUT_BG,
+                                  button_color=ACCENT, button_hover_color=ACCENT_HOVER,
+                                  dropdown_fg_color=PANEL_BG, dropdown_text_color=TEXT_MAIN,
+                                  font=ctk.CTkFont(FONT_FAMILY, 13, "bold"), corner_radius=6)
+                om.pack(fill="x", pady=(3, 0))
+                return om
 
         row = ctk.CTkFrame(grid, fg_color="transparent"); row.pack(fill="x")
         quick_opt(row, "Model", self.model_var, MODEL_SIZES)
-        quick_opt(row, "Source Language", self.src_lang_var, list(LANGUAGE_MAP.keys()))
-        quick_opt(row, "Translate To", self.tgt_lang_var, ["None"] + list(LANGUAGE_MAP.keys())[1:])
+        quick_opt(row, "Source Language", self.src_lang_var, list(LANGUAGE_MAP.keys()), is_lang=True)
+        quick_opt(row, "Translate To", self.tgt_lang_var, ["None"] + list(LANGUAGE_MAP.keys())[1:], is_lang=True)
         quick_opt(row, "Output Format", self.fmt_var, OUTPUT_FORMATS)
 
         self._gen_btn(container)
@@ -1912,8 +2331,7 @@ class SubGenApp:
                                              fg_color=INPUT_BG, button_color=ACCENT, font=ctk.CTkFont(FONT_FAMILY, 12, "bold")).pack(side="right"))
 
         pref_row(card, "Default Source Language", "Default spoken language detection preset",
-                 lambda p: ctk.CTkOptionMenu(p, variable=self.src_lang_var, values=list(LANGUAGE_MAP.keys()), width=180, height=34,
-                                             fg_color=INPUT_BG, button_color=ACCENT, font=ctk.CTkFont(FONT_FAMILY, 12, "bold")).pack(side="right"))
+                 lambda p: SearchableLanguageSelect(p, variable=self.src_lang_var, values=list(LANGUAGE_MAP.keys()), width=200, height=34).pack(side="right"))
 
         ff_str = FFMPEG_PATH or "Not Detected"
         pref_row(card, "FFmpeg Executable Path", f"Detected binary: {ff_str}",
@@ -2438,27 +2856,34 @@ shortcut.Save
         c = self._card(p, "2. Configuration & AI Model")
         grid = ctk.CTkFrame(c, fg_color="transparent"); grid.pack(padx=14, pady=(0, 10), fill="x")
 
-        def col(row_f, label, var, vals, w=160):
+        def col(row_f, label, var, vals, w=160, is_lang=False):
             f = ctk.CTkFrame(row_f, fg_color="transparent"); f.pack(side="left", expand=True, fill="x", padx=4)
             ctk.CTkLabel(f, text=label, text_color=TEXT_SUB,
                          font=ctk.CTkFont(FONT_FAMILY, 12, "bold")).pack(anchor="w")
-            ctk.CTkOptionMenu(f, variable=var, values=vals, width=w, height=38,
-                              fg_color=INPUT_BG, button_color=ACCENT,
-                              button_hover_color=ACCENT_HOVER,
-                              dropdown_fg_color=PANEL_BG,
-                              dropdown_text_color=TEXT_MAIN,
-                              dropdown_hover_color=BORDER_COLOR,
-                              font=ctk.CTkFont(FONT_FAMILY, 13, "bold"),
-                              corner_radius=6,
-                              command=lambda _: self._refresh_model_status(),
-                              ).pack(anchor="w", pady=(3, 0), fill="x")
+            if is_lang:
+                sel = SearchableLanguageSelect(f, variable=var, values=vals, height=38,
+                                               command=lambda _: self._refresh_model_status())
+                sel.pack(anchor="w", pady=(3, 0), fill="x")
+                return sel
+            else:
+                om = ctk.CTkOptionMenu(f, variable=var, values=vals, width=w, height=38,
+                                  fg_color=INPUT_BG, button_color=ACCENT,
+                                  button_hover_color=ACCENT_HOVER,
+                                  dropdown_fg_color=PANEL_BG,
+                                  dropdown_text_color=TEXT_MAIN,
+                                  dropdown_hover_color=BORDER_COLOR,
+                                  font=ctk.CTkFont(FONT_FAMILY, 13, "bold"),
+                                  corner_radius=6,
+                                  command=lambda _: self._refresh_model_status())
+                om.pack(anchor="w", pady=(3, 0), fill="x")
+                return om
 
         row1 = ctk.CTkFrame(grid, fg_color="transparent"); row1.pack(fill="x", pady=(0, 6))
         col(row1, "Whisper Model", self.model_var, MODEL_SIZES)
-        col(row1, "Source Language", self.src_lang_var, list(LANGUAGE_MAP.keys()))
+        col(row1, "Source Language", self.src_lang_var, list(LANGUAGE_MAP.keys()), is_lang=True)
 
         row2 = ctk.CTkFrame(grid, fg_color="transparent"); row2.pack(fill="x", pady=(6, 0))
-        col(row2, "Translate To", self.tgt_lang_var, ["None"] + list(LANGUAGE_MAP.keys())[1:])
+        col(row2, "Translate To", self.tgt_lang_var, ["None"] + list(LANGUAGE_MAP.keys())[1:], is_lang=True)
         col(row2, "Output Format", self.fmt_var, OUTPUT_FORMATS)
 
         # Model Info Pills
@@ -2555,6 +2980,9 @@ shortcut.Save
         adv_col(row1, "Best Of", self.bestof_var, ["1", "2", "3", "5"])
         adv_col(row1, "Temperature", self.temp_var, ["0.0", "0.2", "0.4", "0.6", "0.8"])
 
+        row2 = ctk.CTkFrame(grid, fg_color="transparent"); row2.pack(fill="x", pady=(0, 4))
+        adv_col(row2, "Words / Subtitle", self.max_words_var, ["1", "2", "3", "4", "5", "6", "8", "10", "12"])
+
         tog_row = ctk.CTkFrame(c, fg_color="transparent"); tog_row.pack(fill="x", padx=14, pady=(6, 12))
 
         def toggle(parent, label, var):
@@ -2594,6 +3022,7 @@ shortcut.Save
         self.temp_var.set("0.0")
         self.cond_prev.set(True)
         self.word_ts.set(True)
+        self.max_words_var.set("3")
 
         if hasattr(self, "log_tbox"):
             vram_txt = f"{vram} MB VRAM" if vram else "hardware auto-detected"
@@ -3362,6 +3791,19 @@ shortcut.Save
                 font=ctk.CTkFont(FONT_FAMILY, 12), text_color=TEXT_SUB)
             self._transcript_empty_lbl.pack(pady=30)
 
+    def _reload_transcript_view(self, segs):
+        """Cleanly reload all transcript rows to match the exact resegmented output."""
+        self._pending_rows = []
+        self._transcript_row_widgets = []
+        self._current_highlight_idx = None
+        if hasattr(self, "transcript_rows_frame") and self.transcript_rows_frame:
+            for w in self.transcript_rows_frame.winfo_children():
+                w.destroy()
+            if hasattr(self, "_transcript_empty_lbl") and self._transcript_empty_lbl:
+                self._transcript_empty_lbl.pack_forget()
+            for idx, s in enumerate(segs):
+                self._build_transcript_row(s, idx)
+
     # ── Playback controls (Play/Pause, Mute, Zoom, Fullscreen, Loop, Seek)
     def _toggle_playback(self):
         if not HAS_SOUNDDEVICE:
@@ -3751,18 +4193,41 @@ shortcut.Save
             tgt_name = self.tgt_lang_var.get()
             translate_fn = None
             tgt = LANGUAGE_MAP.get(tgt_name)
-            if tgt and HAS_TRANSLATOR:
+            if tgt == "hinglish":
+                translate_fn = lambda text: transliterate_to_roman(text, src=sl or "hi")
+            elif tgt and HAS_TRANSLATOR:
                 gt = GoogleTranslator(source="auto", target=tgt)
                 translate_fn = lambda text: (gt.translate(text) or text)
 
+            max_w = int(self.max_words_var.get()) if (self.max_words_var.get() and self.max_words_var.get().isdigit()) else 3
+
             def on_seg(seg, lang, pct, cur_end, total_dur, speed, eta):
-                if translate_fn and isinstance(seg, dict) and str(seg.get('text', '')).strip():
-                    try:
-                        seg = {**seg, 'text': translate_fn(seg['text'].strip())}
-                    except Exception:
-                        pass
-                self.all_segs.append(seg)
-                row_idx = len(self.all_segs) - 1
+                # Resegment incoming acoustic chunk into short words/subtitle units immediately
+                sub_chunks = resegment_by_sentence([seg], max_words=max_w, max_duration=2.2)
+                for chunk in sub_chunks:
+                    c_text = str(chunk.get('text', '') or '').strip()
+                    if not c_text:
+                        continue
+                    if translate_fn:
+                        try:
+                            chunk['text'] = translate_fn(c_text)
+                        except Exception:
+                            pass
+                    self.all_segs.append(chunk)
+                    row_idx = len(self.all_segs) - 1
+                    self._add_transcript_row(chunk, row_idx)
+
+                    # Update sidebar / event logs live with the exact chunk
+                    if hasattr(self, "log_tbox") and self.log_tbox:
+                        def _log(c=chunk, num=len(self.all_segs)):
+                            try:
+                                self.log_tbox.configure(state="normal")
+                                self.log_tbox.insert("end", f"[{time.strftime('%H:%M:%S')}] Seg #{num} [{_fmt_srt(c['start'])} --> {_fmt_srt(c['end'])}]: {c['text']}\n")
+                                self.log_tbox.see("end")
+                                self.log_tbox.configure(state="disabled")
+                            except Exception:
+                                pass
+                        self.root.after(0, _log)
 
                 pct_val = float(pct) if pct is not None else 0.0
                 cur_val = float(cur_end) if cur_end is not None else 0.0
@@ -3791,16 +4256,11 @@ shortcut.Save
                     lang_str += f"  →  {tgt_name}"
                 status_msg = f"Transcribing… {pct_str} ({cur_str}/{tot_str})  |  {speed_str}  |  ETA: {eta_str}  |  {lang_str}"
 
-                # Single UI-thread hop per segment instead of a dozen separate
-                # root.after() calls — each is its own Tk event-queue entry, and
-                # on long files emitting several segments/sec that was flooding
-                # the queue and starving redraws, causing visible UI stutter.
                 def _apply_ui():
                     if hasattr(self, "audio_time_lbl") and self.audio_time_lbl:
                         self.audio_time_lbl.configure(text=f"{cur_str} / {tot_str}")
                     if hasattr(self, "audio_scrub_bar") and self.audio_scrub_bar:
                         self.audio_scrub_bar.set(max(0.0, min(pct_val, 1.0)))
-                    self._add_transcript_row(seg, row_idx)
                     self.seg_count.set(seg_num)
                     self.speed_var.set(speed_str)
                     self.processed_var.set(cur_str)
@@ -3821,25 +4281,32 @@ shortcut.Save
                 self.root.after(0, self._err, msg)
 
             self.root.after(0, self._setstatus, f"Transcribing with {model_size}…")
-            transcribe(audio, model_size, sl, on_seg, on_done, on_err)
+            transcribe(audio, model_size, sl, on_seg, on_done, on_err,
+                       beam_size=beam_size, temperature=temperature,
+                       condition_on_previous_text=cond_prev, word_timestamps=word_ts)
         except Exception as e:
             self.root.after(0, self._err, str(e))
 
     def _post(self, segs, lang, inp):
         self.progress_var.set(0.9)
-        # Translation/transliteration already happened live, per segment, in on_seg —
-        # self.all_segs holds the final (already-converted) text in arrival order.
-        segs = self.all_segs
-
-        # Re-segment so every subtitle block ends at a sentence boundary
-        # (. ? !) rather than at a raw Whisper chunk boundary mid-sentence.
-        segs = resegment_by_sentence(segs)
+        max_w = int(self.max_words_var.get()) if (self.max_words_var.get() and self.max_words_var.get().isdigit()) else 3
+        # Final pass resegment using acoustic word timestamps to guarantee 100% matching subtitle segments
+        segs = resegment_by_sentence(self.all_segs, max_words=max_w, max_duration=2.2)
+        self.all_segs = segs
+        self.seg_count.set(len(segs))
+        self._reload_transcript_view(segs)
 
         fmt = self.fmt_var.get()
         out_dir = self.output_dir.get().strip() or str(Path(inp).parent)
         out_path = os.path.join(out_dir, f"{Path(inp).stem}.{fmt.lower()}")
+        # Resolve the output language code so ASS can pick the right font
+        tgt_name = self.tgt_lang_var.get()
+        out_lang_code = LANGUAGE_MAP.get(tgt_name) or LANGUAGE_MAP.get(self.src_lang_var.get())
         try:
-            WRITERS[fmt](segs, out_path)
+            if fmt == "ASS":
+                write_ass(segs, out_path, lang_code=out_lang_code)
+            else:
+                WRITERS[fmt](segs, out_path)
         except Exception as e:
             self._err(f"Write error: {e}"); return
         self._last_out_path = out_path
@@ -3847,6 +4314,16 @@ shortcut.Save
             try: os.unlink(self.tmp_wav)
             except: pass
             self.tmp_wav = None
+
+        if hasattr(self, "log_tbox") and self.log_tbox:
+            try:
+                self.log_tbox.configure(state="normal")
+                self.log_tbox.insert("end", f"[{time.strftime('%H:%M:%S')}] Subtitles complete! Total {len(segs)} segments written to {Path(out_path).name}\n")
+                self.log_tbox.see("end")
+                self.log_tbox.configure(state="disabled")
+            except Exception:
+                pass
+
         # Save to persistent history log
         self._add_history_entry({
             "id": str(int(time.time())),
