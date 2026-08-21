@@ -177,8 +177,8 @@ class TranscribeWorker(QThread):
                 self._tmp_wav = None
 
     def _finish(self, lang):
-        """Mechanical port of SubGenApp._post (subgen.py:4290-4351)."""
-        segs = resegment_by_sentence(self._all_segs, max_words=self.max_words, max_duration=2.2)
+        """Finalize and write subtitles to disk."""
+        segs = list(self._all_segs)
         self._all_segs = segs
 
         inp = self.input_path

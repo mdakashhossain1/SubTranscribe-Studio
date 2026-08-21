@@ -23,6 +23,7 @@ elif importlib.util.find_spec("whisper") is not None:
 _WHISPERCPP_SEG_RE = re.compile(r"^\[(\d\d:\d\d:\d\d\.\d\d\d)\s*-->\s*(\d\d:\d\d:\d\d\.\d\d\d)\]\s*(.*)$")
 _WHISPERCPP_DURATION_RE = re.compile(r",\s*([\d.]+)\s*sec\)")
 _WHISPERCPP_LANG_RE = re.compile(r"auto-detected language:\s*(\w+)")
+_SENT_END = re.compile(r'[.?!]["\')\]]*$')
 
 
 def _parse_whispercpp_ts(ts: str) -> float:
@@ -39,11 +40,18 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
     model_path = GGML_MODELS_DIR / filename
     lang = source_lang or "auto"
 
-    # -mc 0 disables cross-chunk text context: with the default (unlimited context),
-    # whisper.cpp feeds each 30s window's transcript into the next window's decode as a
-    # prompt, which on long audio lets a single decoding error compound and repeat —
-    # showing up as duplicated sentences and stray zero-duration junk segments.
-    cmd = [str(WHISPERCPP_EXE), "-m", str(model_path), "-f", str(audio_path), "-l", lang, "-mc", "0"]
+    # -mc 0 disables cross-chunk text context.
+    # -ml 1 -sow forces word-by-word token segmentation, yielding millisecond-accurate
+    # acoustic timestamps for every single word without linear division distortion.
+    cmd = [
+        str(WHISPERCPP_EXE),
+        "-m", str(model_path),
+        "-f", str(audio_path),
+        "-l", lang,
+        "-mc", "0",
+        "-ml", "1",
+        "-sow",
+    ]
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", errors="replace", bufsize=1,
@@ -55,6 +63,28 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
     detected_lang = lang if lang != "auto" else "unknown"
     result = []
     decode_error = None
+    current_words = []
+
+    def _emit_chunk():
+        if not current_words:
+            return
+        seg_start = current_words[0]["start"]
+        seg_end = current_words[-1]["end"]
+        seg_text = " ".join(w["word"] for w in current_words)
+        s = {
+            "start": seg_start,
+            "end": seg_end,
+            "text": seg_text,
+            "words": list(current_words),
+        }
+        result.append(s)
+        del current_words[:]
+
+        elapsed = max(0.001, time.time() - t0)
+        speed = (seg_end / elapsed) if (elapsed > 0 and seg_end > 0) else 0.0
+        eta = ((total_duration - seg_end) / speed) if (speed > 0 and total_duration > seg_end) else 0.0
+        pct = (seg_end / total_duration) if total_duration > 0 else 0.0
+        on_segment(s, detected_lang, pct, seg_end, total_duration, speed, eta)
 
     for line in proc.stdout:
         line = line.rstrip("\n")
@@ -73,21 +103,21 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
 
         m = _WHISPERCPP_SEG_RE.match(line)
         if m:
-            seg_start = _parse_whispercpp_ts(m.group(1))
-            seg_end = _parse_whispercpp_ts(m.group(2))
-            seg_text = m.group(3).strip()
-            # Skip zero/near-zero-duration entries — these are decode artifacts
-            # (stray duplicate fragments), never legitimate subtitle segments.
-            if seg_end - seg_start < 0.05 or not seg_text:
+            w_start = _parse_whispercpp_ts(m.group(1))
+            w_end = _parse_whispercpp_ts(m.group(2))
+            w_text = m.group(3).strip()
+            if w_end <= w_start or not w_text:
                 continue
-            s = {"start": seg_start, "end": seg_end, "text": seg_text}
-            result.append(s)
 
-            elapsed = max(0.001, time.time() - t0)
-            speed = (seg_end / elapsed) if (elapsed > 0 and seg_end > 0) else 0.0
-            eta = ((total_duration - seg_end) / speed) if (speed > 0 and total_duration > seg_end) else 0.0
-            pct = (seg_end / total_duration) if total_duration > 0 else 0.0
-            on_segment(s, detected_lang, pct, seg_end, total_duration, speed, eta)
+            if current_words:
+                prev_end = current_words[-1]["end"]
+                # Flush burst if pause >= 0.5s, sentence-ending punctuation, or 5+ words buffered
+                if (w_start - prev_end >= 0.5) or _SENT_END.search(current_words[-1]["word"]) or (len(current_words) >= 5):
+                    _emit_chunk()
+
+            current_words.append({"start": w_start, "end": w_end, "word": w_text})
+
+    _emit_chunk()
 
     returncode = proc.wait()
     if returncode != 0:

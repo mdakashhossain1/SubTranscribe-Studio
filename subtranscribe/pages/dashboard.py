@@ -692,8 +692,11 @@ class DashboardPage(QWidget):
             self.status_lbl.setText(payload["status"])
         pct = payload.get("progress", payload.get("pct"))
         if pct is not None:
-            self.progress_bar.setValue(int(pct * 100))
-            self.tile_progress.setText(payload.get("pct_str", f"{int(pct * 100)}%"))
+            pct_float = float(pct)
+            self.progress_bar.setValue(int(pct_float * 100))
+            self.tile_progress.setText(payload.get("pct_str", f"{int(pct_float * 100)}%"))
+            if not self.audio_player.is_playing:
+                self.waveform.set(pct_float)
         if "cur_str" in payload:
             self.tile_processed.setText(payload["cur_str"])
         if "remaining_str" in payload:
@@ -704,6 +707,12 @@ class DashboardPage(QWidget):
             self.tile_segments.setText(str(payload["seg_num"]))
         if "rtf_str" in payload:
             self.tile_rtf.setText(payload["rtf_str"])
+        if "cur_str" in payload and "tot_str" in payload:
+            if not self.audio_player.is_playing:
+                self.audio_time_lbl.setText(f"{payload['cur_str']} / {payload['tot_str']}")
+        elif "cur_str" in payload and self.audio_player.duration > 0:
+            if not self.audio_player.is_playing:
+                self.audio_time_lbl.setText(f"{payload['cur_str']} / {_fmt_time_short(self.audio_player.duration)}")
         if "chunk" in payload:
             self._add_transcript_row(payload["chunk"])
 
@@ -730,6 +739,10 @@ class DashboardPage(QWidget):
         self.all_segs = segs
         self.progress_bar.setValue(100)
         self.tile_progress.setText("100%")
+        if not self.audio_player.is_playing:
+            self.waveform.set(1.0)
+            if hasattr(self, "audio_player") and self.audio_player.duration > 0:
+                self.audio_time_lbl.setText(f"{_fmt_time_short(self.audio_player.duration)} / {_fmt_time_short(self.audio_player.duration)}")
         self.status_lbl.setText(f"Saved: {Path(out_path).name}")
         self.status_lbl.setStyleSheet(f"color: {SUCCESS}; font-size: 12px; border: none;")
         self.gen_btn.setEnabled(True)

@@ -395,10 +395,18 @@ class TranscribePage(QWidget):
     def _on_segment(self, payload: dict):
         if "status" in payload:
             self.status_lbl.setText(payload["status"])
-        if "progress" in payload:
-            self.progress_bar.setValue(int(payload["progress"] * 100))
-        elif "pct" in payload:
-            self.progress_bar.setValue(int(payload["pct"] * 100))
+        pct = payload.get("progress", payload.get("pct"))
+        if pct is not None:
+            pct_float = float(pct)
+            self.progress_bar.setValue(int(pct_float * 100))
+            if not self.audio_player.is_playing:
+                self.waveform.set(pct_float)
+        if "cur_str" in payload and "tot_str" in payload:
+            if not self.audio_player.is_playing:
+                self.audio_time_lbl.setText(f"{payload['cur_str']} / {payload['tot_str']}")
+        elif "cur_str" in payload and self.audio_player.duration > 0:
+            if not self.audio_player.is_playing:
+                self.audio_time_lbl.setText(f"{payload['cur_str']} / {_fmt_time_short(self.audio_player.duration)}")
         if "log_line" in payload:
             self.log_box.appendPlainText(payload["log_line"])
 
@@ -407,6 +415,10 @@ class TranscribePage(QWidget):
         self.main_window.set_busy(False)
         self._last_out_path = out_path
         self.progress_bar.setValue(100)
+        if not self.audio_player.is_playing:
+            self.waveform.set(1.0)
+            if hasattr(self, "audio_player") and self.audio_player.duration > 0:
+                self.audio_time_lbl.setText(f"{_fmt_time_short(self.audio_player.duration)} / {_fmt_time_short(self.audio_player.duration)}")
         self.status_lbl.setText(f"Saved: {Path(out_path).name}")
         self.status_lbl.setStyleSheet(f"color: {SUCCESS}; font-size: 12px;")
         self.log_box.appendPlainText(f"Subtitles complete! Total {len(segs)} segments written to {Path(out_path).name}")

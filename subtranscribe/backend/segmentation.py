@@ -52,6 +52,7 @@ def resegment_by_sentence(segs, max_words=3, max_duration=2.2):
     sentences = []
     buf_words = []
     buf_start = word_timeline[0][0]
+    prev_end = word_timeline[0][1]
 
     def _flush(end_time):
         if buf_words:
@@ -63,9 +64,14 @@ def resegment_by_sentence(segs, max_words=3, max_duration=2.2):
             del buf_words[:]
 
     for (ws, we, word) in word_timeline:
+        # Split across natural silence pauses >= 0.5s so subtitles don't hang over pauses
+        if buf_words and (ws - prev_end >= 0.5):
+            _flush(prev_end)
+
         if not buf_words:
             buf_start = ws
         buf_words.append(word)
+        prev_end = we
 
         n = len(buf_words)
         curr_dur = we - buf_start
@@ -79,6 +85,6 @@ def resegment_by_sentence(segs, max_words=3, max_duration=2.2):
 
     # -- Step 3: flush any trailing words --
     if buf_words:
-        _flush(word_timeline[-1][1])
+        _flush(prev_end)
 
     return sentences if sentences else segs

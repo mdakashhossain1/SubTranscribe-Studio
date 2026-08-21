@@ -89,6 +89,14 @@ class WaveformBar(QWidget):
             pen = QPen(self.unplayed_color, 1, Qt.DashLine)
             painter.setPen(pen)
             painter.drawLine(0, int(mid), w, int(mid))
+            if self.progress > 0.0:
+                split_x = int(self.progress * w)
+                pen_played = QPen(self.played_color, 2, Qt.SolidLine)
+                painter.setPen(pen_played)
+                painter.drawLine(0, int(mid), split_x, int(mid))
+                painter.drawLine(split_x, 3, split_x, int(h - 3))
+                painter.setBrush(self.played_color)
+                painter.drawEllipse(split_x - 4, int(mid) - 4, 8, 8)
             painter.end()
             return
 
