@@ -4,6 +4,7 @@ GoogleTranslator setup inside SubGenApp._pipeline's `on_seg` closure
 (subgen.py:4193-4200) — identical branching/behavior, just named and
 importable instead of a closure captured at every pipeline run."""
 import json
+import time
 import urllib.parse
 import urllib.request
 
@@ -14,6 +15,24 @@ try:
     HAS_TRANSLATOR = True
 except ImportError:
     HAS_TRANSLATOR = False
+
+# Google serves this stock error-page body (instead of a translation) when it
+# rate-limits/blocks the scraper; deep_translator doesn't detect that and
+# happily returns it as if it were real translated text.
+_TRANSLATE_ERROR_SIGNATURE = "There was an error. Please try again later."
+
+
+def _translate_with_retry(gt, text, retries=3, base_delay=0.6):
+    result = None
+    for attempt in range(retries):
+        try:
+            result = gt.translate(text)
+        except Exception:
+            result = None
+        if result and _TRANSLATE_ERROR_SIGNATURE not in result:
+            return result
+        time.sleep(base_delay * (attempt + 1))
+    return text
 
 
 def transliterate_to_roman(text, src="hi"):
@@ -66,5 +85,5 @@ def resolve_translate_fn(source_lang_code, target_name):
         return lambda text: transliterate_to_roman(text, src=source_lang_code or "hi")
     elif tgt and HAS_TRANSLATOR:
         gt = GoogleTranslator(source="auto", target=tgt)
-        return lambda text: (gt.translate(text) or text)
+        return lambda text: _translate_with_retry(gt, text)
     return None
