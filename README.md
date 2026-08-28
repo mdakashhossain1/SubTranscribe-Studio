@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/actions/workflows/build-desktop.yml"><img src="https://github.com/mdakashhossain1/SubTranscribe-Studio/actions/workflows/build-desktop.yml/badge.svg" alt="Build Status"></a>
   <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/stargazers"><img src="https://img.shields.io/github/stars/mdakashhossain1/SubTranscribe-Studio?style=for-the-badge&color=gold" alt="GitHub Stars"></a>
   <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/releases/latest"><img src="https://img.shields.io/github/v/release/mdakashhossain1/SubTranscribe-Studio?label=Download&style=for-the-badge&color=blue" alt="Download Latest Release"></a>
   <a href="https://github.com/mdakashhossain1/SubTranscribe-Studio/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mdakashhossain1/SubTranscribe-Studio?style=for-the-badge&color=green" alt="License"></a>
