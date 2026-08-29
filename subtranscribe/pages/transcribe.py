@@ -318,6 +318,19 @@ class TranscribePage(QWidget):
         row.addLayout(col4, 1)
 
         body.addLayout(row)
+
+        body.addWidget(_field_label("Vocabulary Hint (optional)"))
+        self.vocab_hint_edit = QLineEdit()
+        self.vocab_hint_edit.setPlaceholderText(
+            "Proper nouns, brand/product names, technical terms the audio uses — "
+            "helps the model spell them right instead of guessing from pronunciation, "
+            "e.g. \"remove.bg, Curve.photos, CUDA, VPS\""
+        )
+        self.vocab_hint_edit.setStyleSheet(_LINEEDIT_STYLE)
+        self.vocab_hint_edit.setText(self.state.vocabulary_hint)
+        self.vocab_hint_edit.textChanged.connect(lambda v: setattr(self.state, "vocabulary_hint", v))
+        body.addWidget(self.vocab_hint_edit)
+
         return card
 
 
@@ -385,6 +398,7 @@ class TranscribePage(QWidget):
             condition_on_previous_text=self.cond_prev_check.isChecked(),
             word_timestamps=self.word_ts_check.isChecked(),
             max_words=self.max_words_spin.value(),
+            vocabulary_hint=self.vocab_hint_edit.text(),
         )
         self.worker.segmentReady.connect(self._on_segment)
         self.worker.finished_ok.connect(self._on_finished)

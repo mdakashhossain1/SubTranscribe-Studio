@@ -14,7 +14,7 @@ from PySide6.QtCore import QThread, Signal
 
 from .backend.audio import extract_audio, decode_audio_preview
 from .backend.formatting import _fmt_time_short, _fmt_size
-from .backend.segmentation import resegment_by_sentence
+from .backend.segmentation import resegment_by_sentence, ClauseBuffer, split_translated_for_display
 from .backend.subtitles import WRITERS, write_ass, _fmt_srt
 from .backend.transcribe import transcribe
 from .backend.translate import resolve_translate_fn
@@ -50,7 +50,7 @@ class TranscribeWorker(QThread):
                  src_lang_name: str, tgt_lang_name: str, fmt: str,
                  beam_size: int = 5, temperature: float = 0.0,
                  condition_on_previous_text: bool = False, word_timestamps: bool = True,
-                 max_words: int = 3, parent=None):
+                 max_words: int = 3, vocabulary_hint: str = "", parent=None):
         super().__init__(parent)
         self.input_path = input_path
         self.output_dir = output_dir
@@ -63,6 +63,7 @@ class TranscribeWorker(QThread):
         self.condition_on_previous_text = condition_on_previous_text
         self.word_timestamps = word_timestamps
         self.max_words = max_words
+        self.vocabulary_hint = vocabulary_hint
 
         self._tmp_wav = None
         self._all_segs = []
@@ -102,58 +103,105 @@ class TranscribeWorker(QThread):
                 log_event(f"Translation active: {Path(inp).name} → {self.tgt_lang_name}")
 
             self._start_time = time.time()
+            self._last_progress = (1.0, 0.0, 0.0, 0.0, 0.0)  # pct, cur, total, speed, eta
 
-            def on_seg(seg, lang, pct, cur_end, total_dur, speed, eta):
-                sub_chunks = resegment_by_sentence([seg], max_words=self.max_words, max_duration=2.2)
+            # Accumulates ASR words *across* incoming segments so translation
+            # runs on whole clauses instead of whisper.cpp's own small (1-5
+            # word) burst boundaries. Grouping within a single incoming seg
+            # (the previous approach) can't recover a clause that spans two
+            # or more bursts — verified: that still fed Google Translate
+            # sub-clause fragments and reproduced the original garbled/
+            # mistranslated output even after adding clause-level grouping.
+            clause_buffer = ClauseBuffer()
+
+            def _progress_payload(lang, pct, cur_end, total_dur, speed, eta):
+                pct_val = float(pct) if pct is not None else 0.0
+                cur_val = float(cur_end) if cur_end is not None else 0.0
+                tot_val = float(total_dur) if total_dur is not None else 0.0
+                spd_val = float(speed) if speed is not None else 0.0
+                eta_val = float(eta) if eta is not None else 0.0
+
+                elapsed = time.time() - self._start_time if self._start_time else 0.001
+                rtf = elapsed / max(cur_val, 0.001)
+
+                pct_str = f"{int(pct_val * 100)}%"
+                cur_str = _fmt_time_short(cur_val)
+                tot_str = _fmt_time_short(tot_val)
+                speed_str = f"{spd_val:.1f}x"
+                eta_str = _fmt_time_short(eta_val)
+                rem = max(0, tot_val - cur_val)
+
+                lang_str = f"Detected: {lang}"
+                if translate_fn:
+                    lang_str += f"  →  {self.tgt_lang_name}"
+                status_msg = f"Transcribing… {pct_str} ({cur_str}/{tot_str})  |  {speed_str}  |  ETA: {eta_str}  |  {lang_str}"
+
+                return {
+                    "pct": max(0.02, min(pct_val, 0.99)),
+                    "pct_str": pct_str,
+                    "cur_str": cur_str,
+                    "tot_str": tot_str,
+                    "speed_str": speed_str,
+                    "eta_str": eta_str,
+                    "remaining_str": _fmt_time_short(rem),
+                    "rtf_str": f"{rtf:.2f}",
+                    "status": status_msg,
+                }
+
+            def _emit_progress(lang, pct, cur_end, total_dur, speed, eta):
+                # Status-only heartbeat, no "chunk" key — safe to call on
+                # every incoming segment (including whisper.cpp's live,
+                # content-free progress pings during the DTW/JSON decode
+                # phase, where real subtitle content only arrives at the end)
+                # without it being mistaken for actual output.
+                self.segmentReady.emit(_progress_payload(lang, pct, cur_end, total_dur, speed, eta))
+
+            def _emit_chunks(sub_chunks, lang, pct, cur_end, total_dur, speed, eta):
                 for chunk in sub_chunks:
                     c_text = str(chunk.get('text', '') or '').strip()
                     if not c_text:
                         continue
-                    if translate_fn:
-                        try:
-                            chunk['text'] = translate_fn(c_text)
-                        except Exception:
-                            pass
                     self._all_segs.append(chunk)
                     seg_num = len(self._all_segs)
 
-                    pct_val = float(pct) if pct is not None else 0.0
-                    cur_val = float(cur_end) if cur_end is not None else 0.0
-                    tot_val = float(total_dur) if total_dur is not None else 0.0
-                    spd_val = float(speed) if speed is not None else 0.0
-                    eta_val = float(eta) if eta is not None else 0.0
+                    payload = _progress_payload(lang, pct, cur_end, total_dur, speed, eta)
+                    payload["chunk"] = chunk
+                    payload["seg_num"] = seg_num
+                    payload["log_line"] = (
+                        f"[{time.strftime('%H:%M:%S')}] Seg #{seg_num} "
+                        f"[{_fmt_srt(chunk['start'])} --> {_fmt_srt(chunk['end'])}]: {chunk['text']}"
+                    )
+                    self.segmentReady.emit(payload)
 
-                    elapsed = time.time() - self._start_time if self._start_time else 0.001
-                    rtf = elapsed / max(cur_val, 0.001)
+            def _translate_clauses(clauses):
+                sub_chunks = []
+                for clause in clauses:
+                    c_text = str(clause.get('text', '') or '').strip()
+                    if not c_text:
+                        continue
+                    try:
+                        translated = translate_fn(c_text)
+                    except Exception:
+                        translated = c_text
+                    sub_chunks.extend(split_translated_for_display(
+                        translated, clause['words'],
+                        max_words=self.max_words, max_duration=2.2))
+                return sub_chunks
 
-                    pct_str = f"{int(pct_val * 100)}%"
-                    cur_str = _fmt_time_short(cur_val)
-                    tot_str = _fmt_time_short(tot_val)
-                    speed_str = f"{spd_val:.1f}x"
-                    eta_str = _fmt_time_short(eta_val)
-                    rem = max(0, tot_val - cur_val)
-
-                    lang_str = f"Detected: {lang}"
-                    if translate_fn:
-                        lang_str += f"  →  {self.tgt_lang_name}"
-                    status_msg = f"Transcribing… {pct_str} ({cur_str}/{tot_str})  |  {speed_str}  |  ETA: {eta_str}  |  {lang_str}"
-
-                    self.segmentReady.emit({
-                        "chunk": chunk,
-                        "seg_num": seg_num,
-                        "pct": max(0.02, min(pct_val, 0.99)),
-                        "pct_str": pct_str,
-                        "cur_str": cur_str,
-                        "tot_str": tot_str,
-                        "speed_str": speed_str,
-                        "eta_str": eta_str,
-                        "remaining_str": _fmt_time_short(rem),
-                        "rtf_str": f"{rtf:.2f}",
-                        "status": status_msg,
-                        "log_line": f"[{time.strftime('%H:%M:%S')}] Seg #{seg_num} [{_fmt_srt(chunk['start'])} --> {_fmt_srt(chunk['end'])}]: {chunk['text']}",
-                    })
+            def on_seg(seg, lang, pct, cur_end, total_dur, speed, eta):
+                self._last_progress = (pct, cur_end, total_dur, speed, eta)
+                _emit_progress(lang, pct, cur_end, total_dur, speed, eta)
+                if translate_fn:
+                    sub_chunks = _translate_clauses(clause_buffer.push(seg))
+                else:
+                    sub_chunks = resegment_by_sentence([seg], max_words=self.max_words, max_duration=2.2)
+                _emit_chunks(sub_chunks, lang, pct, cur_end, total_dur, speed, eta)
 
             def on_done(segs, lang):
+                if translate_fn:
+                    tail_chunks = _translate_clauses(clause_buffer.flush_all())
+                    if tail_chunks:
+                        _emit_chunks(tail_chunks, lang, *self._last_progress)
                 self._finish(lang)
 
             def on_err(msg):
@@ -164,7 +212,8 @@ class TranscribeWorker(QThread):
             transcribe(audio, self.model_size, sl, on_seg, on_done, on_err,
                        beam_size=self.beam_size, temperature=self.temperature,
                        condition_on_previous_text=self.condition_on_previous_text,
-                       word_timestamps=self.word_timestamps)
+                       word_timestamps=self.word_timestamps,
+                       initial_prompt=self.vocabulary_hint)
         except Exception as e:
             log_event(f"Transcription failed: {Path(inp).name} — {e}")
             self.error.emit(str(e))

@@ -34,7 +34,8 @@ class AppState(QObject):
         self.temperature = 0.0
         self.condition_on_previous_text = False
         self.word_timestamps = True
-        self.max_words = 3
+        self.max_words = 6
+        self.vocabulary_hint = ""
 
     @property
     def input_file(self):

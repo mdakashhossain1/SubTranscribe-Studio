@@ -25,6 +25,16 @@ _WHISPERCPP_DURATION_RE = re.compile(r",\s*([\d.]+)\s*sec\)")
 _WHISPERCPP_LANG_RE = re.compile(r"auto-detected language:\s*(\w+)")
 _SENT_END = re.compile(r'[.?!]["\')\]]*$')
 
+# NOTE: real per-word pause data requires whisper.cpp's --dtw, which in turn
+# requires flash-attention off (-nfa). That combination was tried and reverted
+# (see project history): on the full ~9-minute file it caused whisper.cpp to
+# silently drop whole spoken sentences (verified against both the reference
+# transcript and this project's own prior output, both of which cover those
+# same stretches continuously) — a worse defect than the pause-alignment gap
+# it was meant to fix. Word timestamps below are therefore linear/contiguous
+# and carry no real silence information; split_translated_for_display's
+# pause-window logic degrades gracefully to its even-split fallback.
+
 
 def _parse_whispercpp_ts(ts: str) -> float:
     h, m, rest = ts.split(":")
@@ -32,7 +42,8 @@ def _parse_whispercpp_ts(ts: str) -> float:
     return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
 
 
-def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error):
+def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error,
+                           beam_size=5, temperature=0.0, initial_prompt=""):
     filename = GGML_MODEL_FILES.get(model_size, (None, None))[1]
     if not filename:
         on_error(f"No GGML model available for '{model_size}'")
@@ -43,6 +54,8 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
     # -mc 0 disables cross-chunk text context.
     # -ml 1 -sow forces word-by-word token segmentation, yielding millisecond-accurate
     # acoustic timestamps for every single word without linear division distortion.
+    # -bs/-tp mirror the user's beam_size/temperature settings — previously hardcoded
+    # to whisper.cpp's own defaults regardless of what was selected in the UI.
     cmd = [
         str(WHISPERCPP_EXE),
         "-m", str(model_path),
@@ -51,7 +64,16 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
         "-mc", "0",
         "-ml", "1",
         "-sow",
+        "-bs", str(max(1, int(beam_size or 5))),
+        "-tp", str(float(temperature or 0.0)),
     ]
+    # A user-supplied hint (proper nouns, brand/product names, technical jargon)
+    # biases the decoder toward the right spelling instead of guessing from
+    # accented/code-switched pronunciation alone. --carry-initial-prompt keeps
+    # it in effect for the whole file, not just the first internal decode window.
+    prompt = (initial_prompt or "").strip()
+    if prompt:
+        cmd += ["--prompt", prompt, "--carry-initial-prompt"]
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", errors="replace", bufsize=1,
@@ -130,10 +152,12 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
 
 
 def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_error,
-               beam_size=5, temperature=0.0, condition_on_previous_text=False, word_timestamps=True):
+               beam_size=5, temperature=0.0, condition_on_previous_text=False, word_timestamps=True,
+               initial_prompt=""):
     try:
         if USE_WHISPERCPP:
-            transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error)
+            transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error,
+                                   beam_size=beam_size, temperature=temperature, initial_prompt=initial_prompt)
         elif BACKEND == "faster_whisper":
             from faster_whisper import WhisperModel
             model = WhisperModel(
@@ -151,7 +175,8 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 beam_size=beam_size,
                 temperature=temperature,
                 condition_on_previous_text=condition_on_previous_text,
-                word_timestamps=word_timestamps
+                word_timestamps=word_timestamps,
+                initial_prompt=(initial_prompt or None),
             )
             det = getattr(info, "language", "unknown") or "unknown"
             raw_dur = getattr(info, "duration", 0.0)
@@ -191,7 +216,8 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 beam_size=beam_size,
                 temperature=temperature,
                 condition_on_previous_text=condition_on_previous_text,
-                word_timestamps=word_timestamps
+                word_timestamps=word_timestamps,
+                initial_prompt=(initial_prompt or None),
             )
             det = result.get("language", "unknown") or "unknown"
             raw_segs = result.get("segments", []) or []

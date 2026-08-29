@@ -206,6 +206,6 @@ def recommend_best_settings() -> dict:
         "temperature": 0.0,
         "condition_on_previous_text": True,
         "word_timestamps": True,
-        "max_words": 3,
+        "max_words": 6,
         "vram_mb": vram,
     }

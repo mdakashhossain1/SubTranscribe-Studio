@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 
 from ..config import LANGUAGE_MAP
+from .eventlog import log_event
 
 try:
     from deep_translator import GoogleTranslator
@@ -22,7 +23,7 @@ except ImportError:
 _TRANSLATE_ERROR_SIGNATURE = "There was an error. Please try again later."
 
 
-def _translate_with_retry(gt, text, retries=3, base_delay=0.6):
+def _translate_with_retry(gt, text, retries=5, base_delay=0.8):
     result = None
     for attempt in range(retries):
         try:
@@ -32,6 +33,9 @@ def _translate_with_retry(gt, text, retries=3, base_delay=0.6):
         if result and _TRANSLATE_ERROR_SIGNATURE not in result:
             return result
         time.sleep(base_delay * (attempt + 1))
+    # All retries exhausted — surface this instead of silently leaking the
+    # source-language text into the output SRT with no trace of the failure.
+    log_event(f"Translation failed after {retries} attempts, keeping source text: {text[:60]!r}")
     return text
 
 
