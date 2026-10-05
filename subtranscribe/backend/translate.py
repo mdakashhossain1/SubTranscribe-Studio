@@ -33,10 +33,9 @@ def _translate_with_retry(gt, text, retries=5, base_delay=0.8):
         if result and _TRANSLATE_ERROR_SIGNATURE not in result:
             return result
         time.sleep(base_delay * (attempt + 1))
-    # All retries exhausted — surface this instead of silently leaking the
-    # source-language text into the output SRT with no trace of the failure.
-    log_event(f"Translation failed after {retries} attempts, keeping source text: {text[:60]!r}")
-    return text
+    message = f"Translation failed after {retries} attempts. Check your internet connection and try again."
+    log_event(message)
+    raise RuntimeError(message)
 
 
 def transliterate_to_roman(text, src="hi"):
@@ -84,10 +83,14 @@ def resolve_translate_fn(source_lang_code, target_name):
 
     Returns a `text -> text` callable, or None if no translation is requested.
     """
+    if target_name == "None":
+        return None
     tgt = LANGUAGE_MAP.get(target_name)
+    if not tgt:
+        raise ValueError(f"Unsupported translation language: {target_name}")
     if tgt == "hinglish":
         return lambda text: transliterate_to_roman(text, src=source_lang_code or "hi")
-    elif tgt and HAS_TRANSLATOR:
+    elif HAS_TRANSLATOR:
         gt = GoogleTranslator(source="auto", target=tgt)
         return lambda text: _translate_with_retry(gt, text)
-    return None
+    raise RuntimeError("Translation requires deep-translator. Install it with: pip install deep-translator")

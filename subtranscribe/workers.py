@@ -179,10 +179,7 @@ class TranscribeWorker(QThread):
                     c_text = str(clause.get('text', '') or '').strip()
                     if not c_text:
                         continue
-                    try:
-                        translated = translate_fn(c_text)
-                    except Exception:
-                        translated = c_text
+                    translated = translate_fn(c_text)
                     sub_chunks.extend(split_translated_for_display(
                         translated, clause['words'],
                         max_words=self.max_words, max_duration=2.2))
