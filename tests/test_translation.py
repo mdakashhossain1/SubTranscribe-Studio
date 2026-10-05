@@ -24,11 +24,10 @@ class TranslationTests(unittest.TestCase):
         }):
             spec.loader.exec_module(self.module)
 
-    def test_english_selection_reaches_translator(self):
-        self.module.GoogleTranslator.return_value.translate.return_value = "Hello"
-        translate = self.module.resolve_translate_fn("hi", "English")
-        self.assertEqual(translate("नमस्ते"), "Hello")
-        self.module.GoogleTranslator.assert_called_once_with(source="auto", target="en")
+    def test_english_selection_never_uses_google(self):
+        self.module.HAS_TRANSLATOR = False
+        self.assertIsNone(self.module.resolve_translate_fn("hi", "English"))
+        self.module.GoogleTranslator.assert_not_called()
 
     def test_no_translation_selected(self):
         self.assertIsNone(self.module.resolve_translate_fn("hi", "None"))
@@ -36,7 +35,7 @@ class TranslationTests(unittest.TestCase):
     def test_missing_dependency_is_reported(self):
         self.module.HAS_TRANSLATOR = False
         with self.assertRaisesRegex(RuntimeError, "deep-translator"):
-            self.module.resolve_translate_fn("hi", "English")
+            self.module.resolve_translate_fn("en", "Hindi")
 
     def test_unknown_language_is_reported(self):
         with self.assertRaises(ValueError):

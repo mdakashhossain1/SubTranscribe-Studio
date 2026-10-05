@@ -93,12 +93,16 @@ class TranscribeWorker(QThread):
                 return
 
             sl = WHISPER_LANG_MAP.get(self.src_lang_name)
+            local_translation = LANGUAGE_MAP.get(self.tgt_lang_name) == "en"
+            task = "translate" if local_translation else "transcribe"
 
             self.segmentReady.emit({"status": f"Loading {self.model_size} model…", "progress": 0.05})
 
             # Resolve translation ONCE up front so each segment can be translated
             # live as it arrives (subgen.py:4189-4200).
             translate_fn = resolve_translate_fn(sl, self.tgt_lang_name)
+            if local_translation:
+                log_event(f"Local Whisper translation active: {Path(inp).name} → English")
             if translate_fn:
                 log_event(f"Translation active: {Path(inp).name} → {self.tgt_lang_name}")
 
@@ -132,7 +136,7 @@ class TranscribeWorker(QThread):
                 rem = max(0, tot_val - cur_val)
 
                 lang_str = f"Detected: {lang}"
-                if translate_fn:
+                if translate_fn or local_translation:
                     lang_str += f"  →  {self.tgt_lang_name}"
                 status_msg = f"Transcribing… {pct_str} ({cur_str}/{tot_str})  |  {speed_str}  |  ETA: {eta_str}  |  {lang_str}"
 
@@ -210,7 +214,7 @@ class TranscribeWorker(QThread):
                        beam_size=self.beam_size, temperature=self.temperature,
                        condition_on_previous_text=self.condition_on_previous_text,
                        word_timestamps=self.word_timestamps,
-                       initial_prompt=self.vocabulary_hint)
+                       initial_prompt=self.vocabulary_hint, task=task)
         except Exception as e:
             log_event(f"Transcription failed: {Path(inp).name} — {e}")
             self.error.emit(str(e))

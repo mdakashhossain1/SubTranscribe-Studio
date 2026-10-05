@@ -43,7 +43,7 @@ def _parse_whispercpp_ts(ts: str) -> float:
 
 
 def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error,
-                           beam_size=5, temperature=0.0, initial_prompt=""):
+                           beam_size=5, temperature=0.0, initial_prompt="", task="transcribe"):
     filename = GGML_MODEL_FILES.get(model_size, (None, None))[1]
     if not filename:
         on_error(f"No GGML model available for '{model_size}'")
@@ -67,6 +67,8 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
         "-bs", str(max(1, int(beam_size or 5))),
         "-tp", str(float(temperature or 0.0)),
     ]
+    if task == "translate":
+        cmd.append("--translate")
     # A user-supplied hint (proper nouns, brand/product names, technical jargon)
     # biases the decoder toward the right spelling instead of guessing from
     # accented/code-switched pronunciation alone. --carry-initial-prompt keeps
@@ -153,11 +155,15 @@ def transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_do
 
 def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_error,
                beam_size=5, temperature=0.0, condition_on_previous_text=False, word_timestamps=True,
-               initial_prompt=""):
+               initial_prompt="", task="transcribe"):
     try:
+        if task not in ("transcribe", "translate"):
+            raise ValueError(f"Unsupported Whisper task: {task}")
+        if task == "translate" and (model_size.endswith(".en") or "turbo" in model_size or model_size.startswith("distil-")):
+            raise ValueError("Local English translation requires a multilingual model such as large-v3, medium, or small.")
         if USE_WHISPERCPP:
             transcribe_whispercpp(audio_path, model_size, source_lang, on_segment, on_done, on_error,
-                                   beam_size=beam_size, temperature=temperature, initial_prompt=initial_prompt)
+                                   beam_size=beam_size, temperature=temperature, initial_prompt=initial_prompt, task=task)
         elif BACKEND == "faster_whisper":
             from faster_whisper import WhisperModel
             model = WhisperModel(
@@ -166,11 +172,13 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
                 compute_type=COMPUTE_TYPE,       # <- float16 on GPU, int8 on CPU
                 download_root=str(MODELS_DIR),   # <- always saves to project/models/
                 cpu_threads=4,
+                local_files_only=True,
             )
             t0 = time.time()
             segs, info = model.transcribe(
                 audio_path,
                 language=source_lang,
+                task=task,
                 vad_filter=True,
                 beam_size=beam_size,
                 temperature=temperature,
@@ -212,6 +220,7 @@ def transcribe(audio_path, model_size, source_lang, on_segment, on_done, on_erro
             result = model.transcribe(
                 audio_path,
                 language=source_lang,
+                task=task,
                 verbose=False,
                 beam_size=beam_size,
                 temperature=temperature,

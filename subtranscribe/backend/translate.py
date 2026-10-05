@@ -81,11 +81,14 @@ def resolve_translate_fn(source_lang_code, target_name):
     target_name: the display name selected in the "Translate To" picker
                  (a LANGUAGE_MAP key, e.g. "Deutsch (German)" or "None").
 
-    Returns a `text -> text` callable, or None if no translation is requested.
+    Returns a `text -> text` callable, or None for disabled translation or
+    English, which the transcription pipeline handles with local Whisper.
     """
     if target_name == "None":
         return None
     tgt = LANGUAGE_MAP.get(target_name)
+    if tgt == "en":
+        return None
     if not tgt:
         raise ValueError(f"Unsupported translation language: {target_name}")
     if tgt == "hinglish":
